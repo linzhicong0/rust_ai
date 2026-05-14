@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Framework Requirements</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-card-hover: #222638;
+    --bg-phase: #141720;
+    --border: #2a2e3e;
+    --border-light: #353a50;
+    --text: #e2e4ed;
+    --text-muted: #8b90a5;
+    --text-dim: #5c6078;
+    --accent: #7c6aef;
+    --accent-light: #9d8df5;
+    --accent-bg: rgba(124,106,239,0.08);
+    --green: #4ade80;
+    --green-bg: rgba(74,222,128,0.1);
+    --yellow: #fbbf24;
+    --yellow-bg: rgba(251,191,36,0.1);
+    --red: #f87171;
+    --red-bg: rgba(248,113,113,0.1);
+    --blue: #60a5fa;
+    --blue-bg: rgba(96,165,250,0.1);
+    --code-bg: #12141e;
+    --code-text: #c9d1d9;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+
+  [data-theme="light"] {
+    --bg: #f8f9fc;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f5f6fa;
+    --bg-phase: #f0f1f6;
+    --border: #e2e4ed;
+    --border-light: #d0d3e0;
+    --text: #1a1d2e;
+    --text-muted: #5c6078;
+    --text-dim: #8b90a5;
+    --accent: #6c5ce7;
+    --accent-light: #7c6aef;
+    --accent-bg: rgba(108,92,231,0.06);
+    --green-bg: rgba(34,197,94,0.08);
+    --yellow-bg: rgba(234,179,8,0.08);
+    --red-bg: rgba(239,68,68,0.08);
+    --blue-bg: rgba(59,130,246,0.08);
+    --code-bg: #f1f3f9;
+    --code-text: #374151;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Header */
+  header {
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+
+  header h1 span { color: var(--accent); }
+
+  header p {
+    color: var(--text-muted);
+    margin-top: 8px;
+    font-size: 1rem;
+  }
+
+  .theme-toggle {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Stats bar */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+
+  .stat-number {
+    font-size: 2rem;
+    font-weight: 800;
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
+  }
+
+  .stat-phase1 .stat-number { color: var(--accent); }
+  .stat-phase2 .stat-number { color: var(--blue); }
+  .stat-phase3 .stat-number { color: var(--green); }
+  .stat-total .stat-number { color: var(--text); }
+
+  /* Phase sections */
+  .phase {
+    margin-bottom: 56px;
+  }
+
+  .phase-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .phase-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .phase-badge.p0 { background: var(--accent-bg); color: var(--accent-light); border: 1px solid rgba(124,106,239,0.25); }
+  .phase-badge.p1 { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(96,165,250,0.25); }
+  .phase-badge.p2 { background: var(--green-bg); color: var(--green); border: 1px solid rgba(74,222,128,0.25); }
+
+  .phase-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .phase-desc {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.92rem;
+    margin-bottom: 24px;
+    padding-left: 4px;
+  }
+
+  /* Requirement card */
+  .req-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+    box-shadow: var(--shadow);
+  }
+  .req-card:hover {
+    border-color: var(--border-light);
+    background: var(--bg-card-hover);
+    transform: translateY(-1px);
+  }
+
+  .req-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+
+  .req-id {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--accent-bg);
+    color: var(--accent-light);
+    border: 1px solid rgba(124,106,239,0.2);
+  }
+
+  .req-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text);
+  }
+
+  .difficulty {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .difficulty.easy { background: var(--green-bg); color: var(--green); }
+  .difficulty.medium { background: var(--yellow-bg); color: var(--yellow); }
+  .difficulty.hard { background: var(--red-bg); color: var(--red); }
+
+  .req-body {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  .req-details {
+    list-style: none;
+    margin-top: 10px;
+    padding: 0;
+  }
+
+  .req-details li {
+    position: relative;
+    padding-left: 18px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.8;
+  }
+
+  .req-details li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.5;
+  }
+
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    background: var(--code-bg);
+    color: var(--accent-light);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
+  }
+
+  /* Summary table */
+  .summary-section {
+    margin-top: 56px;
+    padding-top: 40px;
+    border-top: 2px solid var(--border);
+  }
+
+  .summary-section h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  th {
+    background: var(--bg-card);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 14px 18px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 14px 18px;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--accent-bg); }
+
+  /* Progress bar */
+  .progress-bar-wrap {
+    margin-top: 32px;
+  }
+
+  .progress-bar-wrap h3 {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  .progress-bar-outer {
+    height: 10px;
+    background: var(--bg-card);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    border: 1px solid var(--border);
+  }
+
+  .progress-segment {
+    height: 100%;
+    transition: width 0.5s;
+  }
+
+  .progress-segment.p0 { background: var(--accent); }
+  .progress-segment.p1 { background: var(--blue); }
+  .progress-segment.p2 { background: var(--green); }
+
+  .progress-legend {
+    display: flex;
+    gap: 24px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .legend-dot.p0 { background: var(--accent); }
+  .legend-dot.p1 { background: var(--blue); }
+  .legend-dot.p2 { background: var(--green); }
+
+  /* Footer */
+  footer {
+    margin-top: 64px;
+    padding: 24px 0;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    header h1 { font-size: 1.5rem; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .req-card { padding: 16px; }
+    .phase-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    table { font-size: 0.82rem; }
+    th, td { padding: 10px 12px; }
+  }
+
+  /* Nav */
+  .toc {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 40px;
+    box-shadow: var(--shadow);
+  }
+
+  .toc h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .toc-links {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .toc-links a {
+    color: var(--accent-light);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(124,106,239,0.2);
+    transition: all 0.2s;
+  }
+  .toc-links a:hover {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+  }
+
+  /* Filter */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .filter-btn:hover, .filter-btn.active {
+    border-color: var(--accent);
+    color: var(--accent-light);
+    background: var(--accent-bg);
+  }
+
+  /* Status badge */
+  .status-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s;
+    margin-left: auto;
+  }
+
+  .status-toggle.not-done {
+    background: rgba(100,116,139,0.12);
+    color: #94a3b8;
+    border: 1px solid rgba(100,116,139,0.25);
+  }
+
+  .status-toggle.done {
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid rgba(74,222,128,0.35);
+  }
+
+  .status-toggle:hover { transform: scale(1.05); }
+
+  .status-toggle .check-icon {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    line-height: 1;
+  }
+
+  .status-toggle.not-done .check-icon {
+    border: 1.5px solid #94a3b8;
+    color: transparent;
+  }
+
+  .status-toggle.done .check-icon {
+    background: var(--green);
+    color: #0f1117;
+    border: 1.5px solid var(--green);
+  }
+
+  /* Done card styling */
+  .req-card.is-done {
+    opacity: 0.65;
+    border-color: rgba(74,222,128,0.2);
+  }
+  .req-card.is-done:hover { opacity: 0.85; }
+  .req-card.is-done .req-name {
+    text-decoration: line-through;
+    text-decoration-color: var(--green);
+  }
+
+  /* Progress stat */
+  .stat-progress .stat-number {
+    background: linear-gradient(135deg, var(--accent), var(--green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .stat-bar-mini {
+    margin-top: 6px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .stat-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    transition: width 0.4s;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="header-row">
+      <div>
+        <h1>AI Framework <span>Requirements</span></h1>
+        <p>Sorted by build priority &mdash; P0 &rarr; P1 &rarr; P2, ordered easiest-first within each phase.</p>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()">&#9790; Toggle Theme</button>
+    </div>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card stat-progress"><span class="stat-number" id="done-count">0 / 85</span><span class="stat-label">Completed</span><div class="stat-bar-mini"><div class="stat-bar-fill" id="done-bar" style="width:0%"></div></div></div>
+    <div class="stat-card stat-total"><span class="stat-number">85</span><span class="stat-label">Total Requirements</span></div>
+    <div class="stat-card stat-phase1"><span class="stat-number" id="p1-count">0 / 13</span><span class="stat-label">Phase 1 &mdash; Core</span></div>
+    <div class="stat-card stat-phase2"><span class="stat-number" id="p2-count">0 / 24</span><span class="stat-label">Phase 2 &mdash; Essential</span></div>
+    <div class="stat-card stat-phase3"><span class="stat-number" id="p3-count">0 / 48</span><span class="stat-label">Phase 3 &mdash; Advanced</span></div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-bar-wrap">
+    <h3>Build Distribution</h3>
+    <div class="progress-bar-outer">
+      <div class="progress-segment p0" style="width:15.3%"></div>
+      <div class="progress-segment p1" style="width:28.2%"></div>
+      <div class="progress-segment p2" style="width:56.5%"></div>
+    </div>
+    <div class="progress-legend">
+      <span class="legend-item"><span class="legend-dot p0"></span> Phase 1 (13)</span>
+      <span class="legend-item"><span class="legend-dot p1"></span> Phase 2 (24)</span>
+      <span class="legend-item"><span class="legend-dot p2"></span> Phase 3 (48)</span>
+    </div>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc" style="margin-top:32px">
+    <h3>Jump to Phase</h3>
+    <div class="toc-links">
+      <a href="#phase1">Phase 1 &mdash; Foundation</a>
+      <a href="#phase2">Phase 2 &mdash; Production-Ready</a>
+      <a href="#phase3">Phase 3 &mdash; Advanced</a>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterCards('all', this)">All</button>
+    <button class="filter-btn" onclick="filterCards('easy', this)">Easy</button>
+    <button class="filter-btn" onclick="filterCards('medium', this)">Medium</button>
+    <button class="filter-btn" onclick="filterCards('hard', this)">Hard</button>
+    <button class="filter-btn" onclick="filterCards('todo', this)" style="margin-left:8px">&#9744; Not Done</button>
+    <button class="filter-btn" onclick="filterCards('done', this)">&#9745; Done</button>
+  </div>
+
+  <!-- ==================== PHASE 1 ==================== -->
+  <div class="phase" id="phase1">
+    <div class="phase-header">
+      <span class="phase-badge p0">&#9670; P0</span>
+      <span class="phase-title">Phase 1: Foundation</span>
+    </div>
+    <p class="phase-desc">Get a working framework that can call an LLM, define agents, run tools, and produce structured output.</p>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head">
+        <span class="req-id">REQ-15.3</span>
+        <span class="req-name">Configuration</span>
+        <span class="difficulty easy">Easy</span>
+      </div>
+      <div class="req-body">The framework SHALL support configuration through code, YAML/JSON files, and environment variables with sensible defaults.</div>
+      <ul class="req-details">
+        <li>API keys, model defaults, logging levels</li>
+        <li>Hierarchical: defaults &lt; file &lt; env vars &lt; code overrides</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head">
+        <span class="req-id">REQ-11.1</span>
+        <span class="req-name">Logging</span>
+        <span class="difficulty easy">Easy</span>
+      </div>
+      <div class="req-body">The framework SHALL provide structured logging of all LLM interactions (input, output, latency, tokens) with configurable log levels.</div>
+      <ul class="req-details">
+        <li>Log every request/response pair with timing</li>
+        <li>Configurable verbosity: none, errors-only, verbose</li>
+        <li>Structured JSON output for machine parsing</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head">
+        <span class="req-id">REQ-1.2</span>
+        <span class="req-name">Model Configuration</span>
+        <span class="difficulty easy">Easy</span>
+      </div>
+      <div class="req-body">The framework SHALL allow per-request configuration of model parameters: temperature, max tokens, top-p, frequency penalty, presence penalty, and stop sequences.</div>
+      <ul class="req-details">
+        <li>A <code>ModelConfig</code> struct with builder pattern</li>
+        <li>Per-request overrides without mutating defaults</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head">
+        <span class="req-id">REQ-15.1</span>
+        <span class="req-name">SDK/API Design</span>
+        <span class="difficulty easy">Easy</span>
+      </div>
+      <div class="req-body">The framework SHALL provide a clean, intuitive API with strong typing, comprehensive documentation, and idiomatic language patterns.</div>
+      <ul class="req-details">
+        <li>Public API surface: <code>Client</code>, <code>Agent</code>, <code>Tool</code>, <code>Memory</code>, <code>Pipeline</code></li>
+        <li>Consistent error types with thiserror/anyhow</li>
+        <li>Builder patterns for complex configuration</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head">
+        <span class="req-id">REQ-4.1</span>
+        <span class="req-name">Template System</span>
+        <span class="difficulty easy">Easy</span>
+      </div>
+      <div class="req-body">The framework SHALL support prompt templates with variable interpolation, conditional logic, and template inheritance.</div>
+      <ul class="req-details">
+        <li>Variable substitution: <code>{{variable}}</code></li>
+        <li>Conditional blocks: <code>{{#if condition}}...{{/if}}</code></li>
+        <li>Template composition (include partials)</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head">
+        <span class="req-id">REQ-3.1</span>
+        <span class="req-name">Tool Definition</span>
+        <span class="difficulty easy">Easy</span>
+      </div>
+      <div class="req-body">The framework SHALL provide a declarative way to define tools with: name, description, input schema (JSON Schema), output schema, and execution function.</div>
+      <ul class="req-details">
+        <li><code>Tool</code> trait with <code>name()</code>, <code>description()</code>, <code>schema()</code>, <code>execute()</code></li>
+        <li>Macro or derive attribute for ergonomic definition</li>
+        <li>Sync and async execution support</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head">
+        <span class="req-id">REQ-9.1</span>
+        <span class="req-name">Structured Output</span>
+        <span class="difficulty medium">Medium</span>
+      </div>
+      <div class="req-body">The framework SHALL enforce structured output formats (JSON, XML, Markdown) with schema validation using JSON Schema or typed models.</div>
+      <ul class="req-details">
+        <li>Request JSON-mode from providers that support it</li>
+        <li>Validate response against schema</li>
+        <li>Re-prompt on validation failure (with retry limit)</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head">
+        <span class="req-id">REQ-1.1</span>
+        <span class="req-name">Multi-Provider Support</span>
+        <span class="difficulty medium">Medium</span>
+      </div>
+      <div class="req-body">The framework SHALL support multiple LLM providers (OpenAI, Anthropic, Google, local models) through a unified interface, allowing provider switching without code changes.</div>
+      <ul class="req-details">
+        <li><code>Provider</code> trait: <code>complete()</code>, <code>stream()</code>, <code>embed()</code></li>
+        <li>Implementations for OpenAI, Anthropic, Google, Ollama</li>
+        <li>Provider-agnostic message types (User, Assistant, System, Tool)</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head">
+        <span class="req-id">REQ-1.4</span>
+        <span class="req-name">Streaming Support</span>
+        <span class="difficulty medium">Medium</span>
+      </div>
+      <div class="req-body">The framework SHALL support streaming responses with token-by-token delivery, including the ability to cancel mid-stream.</div>
+      <ul class="req-details">
+        <li>Async stream (e.g., <code>impl Stream&lt;Item = Chunk&gt;</code>)</li>
+        <li>Cancellation via <code>CancellationToken</code> or drop</li>
+        <li>Accumulate stream into final response object</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head">
+        <span class="req-id">REQ-5.1</span>
+        <span class="req-name">Conversation Memory</span>
+        <span class="difficulty medium">Medium</span>
+      </div>
+      <div class="req-body">The framework SHALL store and retrieve conversation history with support for multiple conversation threads per user/session.</div>
+      <ul class="req-details">
+        <li><code>Memory</code> trait: <code>add()</code>, <code>get()</code>, <code>clear()</code></li>
+        <li>In-memory implementation (default)</li>
+        <li>Thread-scoped storage (multiple concurrent conversations)</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head">
+        <span class="req-id">REQ-2.1</span>
+        <span class="req-name">Agent Definition</span>
+        <span class="difficulty medium">Medium</span>
+      </div>
+      <div class="req-body">The framework SHALL support defining agents with configurable properties: role, goal, backstory, personality, and system instructions.</div>
+      <ul class="req-details">
+        <li><code>Agent</code> struct with role, goal, backstory, model config, tools, memory</li>
+        <li>System prompt auto-assembly from agent properties</li>
+        <li>Agent execution loop: think &rarr; act (tool call) &rarr; observe &rarr; respond</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head">
+        <span class="req-id">REQ-7.1</span>
+        <span class="req-name">Pipeline Definition</span>
+        <span class="difficulty medium">Medium</span>
+      </div>
+      <div class="req-body">The framework SHALL support defining multi-step workflows/pipelines with sequential, parallel, conditional, and loop execution patterns.</div>
+      <ul class="req-details">
+        <li><code>Pipeline</code> builder: <code>.step()</code>, <code>.parallel()</code>, <code>.conditional()</code>, <code>.loop()</code></li>
+        <li>Pipeline context that flows data between steps</li>
+        <li>Pipeline-level error handling and timeout</li>
+      </ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head">
+        <span class="req-id">REQ-7.2</span>
+        <span class="req-name">Task Definition</span>
+        <span class="difficulty medium">Medium</span>
+      </div>
+      <div class="req-body">The framework SHALL support defining tasks with: description, expected output, dependencies, assigned agent, timeout, and retry policy.</div>
+      <ul class="req-details">
+        <li><code>Task</code> struct with agent assignment, input/output types</li>
+        <li>Timeout and retry configuration per task</li>
+        <li>Expected output description for validation</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ==================== PHASE 2 ==================== -->
+  <div class="phase" id="phase2">
+    <div class="phase-header">
+      <span class="phase-badge p1">&#9670; P1</span>
+      <span class="phase-title">Phase 2: Production-Ready</span>
+    </div>
+    <p class="phase-desc">Make the framework useful for real applications: RAG, tooling, caching, multi-agent, deployment.</p>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-4.3</span><span class="req-name">Context Window Management</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL automatically manage context window usage, including truncation strategies, summarization of older messages, and prioritization of recent context.</div>
+      <ul class="req-details"><li>Token counting per message</li><li>Strategies: truncate oldest, summarize older context, sliding window</li><li>Warn when approaching limit</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-10.4</span><span class="req-name">Cost Tracking</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL track token usage and estimated costs per request, per agent, per workflow, and per project.</div>
+      <ul class="req-details"><li>Accumulate prompt/completion tokens per call</li><li>Cost calculation from model pricing table</li><li>Queryable by scope: request, agent, workflow, global</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-12.1</span><span class="req-name">Response Caching</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL cache LLM responses with configurable cache keys (prompt hash, model, parameters) and TTL policies.</div>
+      <ul class="req-details"><li>In-memory LRU cache (default)</li><li>Cache key: hash of (prompt, model, config)</li><li>Configurable TTL and max size</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-3.3</span><span class="req-name">Built-in Tools</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL include built-in tools for common operations: file I/O, web search, code execution, HTTP requests, and shell commands.</div>
+      <ul class="req-details"><li><code>FileRead</code>, <code>FileWrite</code>, <code>HttpFetch</code>, <code>WebSearch</code>, <code>ShellExec</code></li><li>Each with proper schema, error handling, and sandboxed defaults</li><li>Opt-in &mdash; users choose which to enable</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-2.4</span><span class="req-name">Agent Memory</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL provide per-agent memory that persists across interactions, including short-term (conversation) and long-term (knowledge) memory.</div>
+      <ul class="req-details"><li>Short-term: recent N messages or token window</li><li>Long-term: key-value or vector store backed</li><li>Agents reference their own memory automatically</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-2.3</span><span class="req-name">Agent Delegation</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL allow agents to delegate tasks to other agents, including hierarchical delegation (manager &rarr; worker) and peer delegation.</div>
+      <ul class="req-details"><li>Manager agent with pool of worker agents</li><li><code>delegate(task, agent)</code> as a built-in tool for agents</li><li>Result aggregation from delegated tasks</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-1.3</span><span class="req-name">Model Registry</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL maintain a registry of available models with metadata (context window size, capabilities, cost per token, supported features) to enable intelligent model selection.</div>
+      <ul class="req-details"><li>Static registry of known models with metadata</li><li>Dynamic registration of custom/local models</li><li>Query by capability: "supports vision", "max 200k context"</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-7.3</span><span class="req-name">Task Dependencies</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support task dependency graphs (DAGs), ensuring tasks execute only after their dependencies complete.</div>
+      <ul class="req-details"><li>DAG builder: <code>task.depends_on(other_task)</code></li><li>Topological sort for execution order</li><li>Detect and reject circular dependencies</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-7.4</span><span class="req-name">Error Handling</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL provide configurable error handling per task: retry with backoff, fallback to alternative agent/model, skip, or fail pipeline.</div>
+      <ul class="req-details"><li>Per-task policy: retry (n times, backoff), fallback, skip, halt</li><li>Global default with per-task override</li><li>Error context propagation to downstream tasks</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-9.3</span><span class="req-name">Guardrails</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support input and output guardrails for content filtering, PII detection, toxicity checking, and custom validation rules.</div>
+      <ul class="req-details"><li><code>Guardrail</code> trait: <code>check(input) -&gt; Result&lt;(), Rejection&gt;</code></li><li>Chain multiple guardrails (input chain, output chain)</li><li>Built-in: regex PII detector, length limiter</li><li>Custom: user-defined validation functions</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-11.2</span><span class="req-name">Tracing</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support distributed tracing across multi-step workflows, showing the full execution graph with timing and status.</div>
+      <ul class="req-details"><li>Span per: LLM call, tool execution, pipeline step, agent turn</li><li>Hierarchical parent-child relationships</li><li>Export to OpenTelemetry or JSON</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-14.1</span><span class="req-name">Concurrent Execution</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support concurrent execution of multiple agents and workflows with configurable concurrency limits.</div>
+      <ul class="req-details"><li>Semaphore-based concurrency limits</li><li>Parallel task execution in pipelines</li><li>Thread-safe shared state</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-13.1</span><span class="req-name">Prompt Injection Defense</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL detect and mitigate prompt injection attacks through input sanitization, role separation, and output monitoring.</div>
+      <ul class="req-details"><li>Input scanning for common injection patterns</li><li>System prompt isolation from user input</li><li>Output monitoring for leaked instructions</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-15.4</span><span class="req-name">Plugin System</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support a plugin system for extending functionality: custom tools, memory backends, model providers, and middleware.</div>
+      <ul class="req-details"><li><code>Plugin</code> trait with lifecycle hooks: <code>on_load()</code>, <code>on_request()</code>, <code>on_response()</code></li><li>Dynamic registration at startup</li><li>Plugin discovery from configured directories</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-16.1</span><span class="req-name">API Server</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL expose agents and workflows as RESTful and/or GraphQL API endpoints with authentication.</div>
+      <ul class="req-details"><li>REST endpoints: <code>/agents/{id}/run</code>, <code>/pipelines/{id}/execute</code></li><li>Request/response with typed JSON bodies</li><li>API key auth, rate limiting per key</li><li>Built with axum/actix-web</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-8.1</span><span class="req-name">Image Understanding</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support image inputs for analysis, description, comparison, and OCR through vision-capable models.</div>
+      <ul class="req-details"><li>Image message type in provider-agnostic format</li><li>Base64 and URL image inputs</li><li>Multi-image comparison support</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-5.2</span><span class="req-name">Long-term Memory</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL provide long-term memory storage (vector database, graph database) with semantic search and retrieval.</div>
+      <ul class="req-details"><li><code>LongTermMemory</code> trait: <code>store()</code>, <code>search()</code>, <code>delete()</code></li><li>Vector store backends: Qdrant, pgvector, in-memory HNSW</li><li>Embedding-based semantic search with configurable similarity threshold</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-6.1</span><span class="req-name">Document Ingestion</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL ingest documents in multiple formats, chunk them into appropriate segments, and generate embeddings for retrieval.</div>
+      <ul class="req-details"><li>Parsers: PDF, HTML, Markdown, plain text, DOCX</li><li>Configurable chunking strategies (see REQ-6.5)</li><li>Automatic embedding generation and indexing</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-6.5</span><span class="req-name">Chunking Strategies</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support configurable chunking: fixed-size, sentence-based, paragraph-based, semantic, and recursive splitting.</div>
+      <ul class="req-details"><li><code>Chunker</code> trait with strategy implementations</li><li>Configurable chunk size and overlap</li><li>Metadata preservation (page number, section header)</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-6.2</span><span class="req-name">Vector Store Integration</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL integrate with popular vector stores (Pinecone, Weaviate, Chroma, Qdrant, pgvector) through a unified interface.</div>
+      <ul class="req-details"><li><code>VectorStore</code> trait: <code>upsert()</code>, <code>query()</code>, <code>delete()</code></li><li>Implementations per backend</li><li>Connection pooling and health checks</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-6.3</span><span class="req-name">Retrieval Strategies</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support multiple retrieval strategies: semantic search, keyword search (BM25), hybrid search, and re-ranking.</div>
+      <ul class="req-details"><li><code>Retriever</code> trait with pluggable strategies</li><li>Semantic: embedding similarity search</li><li>BM25: keyword-based sparse retrieval</li><li>Hybrid: combine semantic + keyword scores</li><li>Re-ranking: cross-encoder or LLM-based reranking</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-6.4</span><span class="req-name">Context Injection</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL automatically inject retrieved context into prompts with citation support, enabling source attribution in responses.</div>
+      <ul class="req-details"><li>Template placeholder for retrieved context: <code>{{#context}}...{{/context}}</code></li><li>Source citations: [1], [2] linked to original documents</li><li>Deduplication of similar retrieved chunks</li></ul>
+    </div>
+  </div>
+
+  <!-- ==================== PHASE 3 ==================== -->
+  <div class="phase" id="phase3">
+    <div class="phase-header">
+      <span class="phase-badge p2">&#9670; P2</span>
+      <span class="phase-title">Phase 3: Advanced</span>
+    </div>
+    <p class="phase-desc">Polish, advanced features, enterprise readiness.</p>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-3.4</span><span class="req-name">Tool Validation</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL validate tool inputs against their schema before execution and provide structured error handling.</div>
+      <ul class="req-details"><li>JSON Schema validation on tool input</li><li>Clear error messages with path to invalid field</li><li>Coercion of compatible types (string "5" &rarr; int 5)</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-9.2</span><span class="req-name">Output Parsing</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL parse and validate LLM outputs, handling common failure modes (incomplete JSON, malformed responses) with automatic retry.</div>
+      <ul class="req-details"><li>Robust JSON extraction from markdown code blocks</li><li>Fix common issues: trailing commas, unquoted keys</li><li>Retry with error feedback on parse failure</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-9.4</span><span class="req-name">Output Formatting</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL support configurable output formatting: plain text, Markdown, code blocks, tables, and custom templates.</div>
+      <ul class="req-details"><li>Format specifications on task/agent definitions</li><li>Post-processing pipeline for output transformation</li><li>Template-based formatting</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-12.4</span><span class="req-name">Rate Limiting</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL support rate limiting per provider, per model, and per agent with configurable RPM/TPM limits and queuing.</div>
+      <ul class="req-details"><li>Token bucket algorithm</li><li>Queued requests when limit reached</li><li>Configurable per provider/model/agent</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-4.4</span><span class="req-name">System Prompt Assembly</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL support composable system prompts built from modular sections (instructions, tools, persona, guardrails).</div>
+      <ul class="req-details"><li><code>SystemPrompt</code> builder: <code>.persona()</code>, <code>.instructions()</code>, <code>.tools()</code>, <code>.guardrails()</code></li><li>Automatic ordering and deduplication</li><li>Section enable/disable flags</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-5.4</span><span class="req-name">Memory Scoping</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL support scoped memory: per-agent, per-session, per-user, and global, with configurable isolation.</div>
+      <ul class="req-details"><li>Scope hierarchy: global &gt; user &gt; session &gt; agent</li><li>Read/write permissions per scope</li><li>Configurable isolation between scopes</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-5.5</span><span class="req-name">Memory Expiry</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL support time-based memory expiry and relevance-based eviction policies.</div>
+      <ul class="req-details"><li>TTL per memory entry</li><li>LRU eviction when capacity reached</li><li>Relevance scoring for eviction priority</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-7.5</span><span class="req-name">Human-in-the-Loop</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL support human approval/rejection steps within workflows, with configurable approval triggers and timeout handling.</div>
+      <ul class="req-details"><li><code>HumanApproval</code> step type in pipelines</li><li>Configurable timeout (auto-reject or auto-approve)</li><li>Callback interface for UI integration</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-12.3</span><span class="req-name">Prompt Caching</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL leverage provider-side prompt caching (e.g., Anthropic prompt caching) to reduce costs and latency.</div>
+      <ul class="req-details"><li>Detect provider caching support</li><li>Mark cacheable prompt prefixes</li><li>Report cache hit/miss in response metadata</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-15.5</span><span class="req-name">Hot Reload</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL support hot reloading of configuration, prompts, and agent definitions during development.</div>
+      <ul class="req-details"><li>File watcher on config/prompt directories</li><li>Atomic swap of updated definitions</li><li>No disruption to in-flight requests</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="easy">
+      <div class="req-head"><span class="req-id">REQ-15.6</span><span class="req-name">Type Safety</span><span class="difficulty easy">Easy</span></div>
+      <div class="req-body">The framework SHALL provide type-safe interfaces for all public APIs with generic type parameters for inputs and outputs.</div>
+      <ul class="req-details"><li>Generic <code>Agent&lt;I, O&gt;</code> with typed input/output</li><li>Generic <code>Tool&lt;I, O&gt;</code> with typed execute</li><li>Compile-time verification of pipeline type flow</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-3.2</span><span class="req-name">Tool Discovery</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL allow dynamic tool registration and discovery, enabling agents to find available tools at runtime.</div>
+      <ul class="req-details"><li><code>ToolRegistry</code>: <code>register()</code>, <code>get()</code>, <code>list()</code></li><li>Query by name, tag, or capability</li><li>Runtime registration from plugins</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-3.5</span><span class="req-name">Tool Composition</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support tool chaining, where the output of one tool feeds into the input of another within a single agent turn.</div>
+      <ul class="req-details"><li>Pipeline of tools: <code>tool_a.pipe(tool_b)</code></li><li>Type-checked composition at build time</li><li>Intermediate result inspection for debugging</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-4.2</span><span class="req-name">Prompt Registry</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL maintain a registry of prompts with versioning, enabling A/B testing and rollback.</div>
+      <ul class="req-details"><li><code>PromptRegistry</code>: <code>register()</code>, <code>get(version)</code>, <code>activate()</code></li><li>Version history with diff view</li><li>A/B assignment by hash of (user, prompt_id)</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-2.2</span><span class="req-name">Agent Lifecycle</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL manage the full agent lifecycle: initialization, execution, pause, resume, and termination.</div>
+      <ul class="req-details"><li>State machine: Created &rarr; Running &rarr; Paused &rarr; Running &rarr; Stopped</li><li>Persistence of agent state for resume</li><li>Graceful shutdown with in-flight request completion</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-2.5</span><span class="req-name">Agent Planning</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL enable agents to create and execute multi-step plans, break down complex goals, and replan on failure.</div>
+      <ul class="req-details"><li><code>Plan</code> struct: list of steps with dependencies</li><li>LLM-assisted plan generation from goal</li><li>Re-planning on step failure</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-2.6</span><span class="req-name">Agent Communication</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support inter-agent messaging through structured protocols (request/response, publish/subscribe, broadcast).</div>
+      <ul class="req-details"><li><code>MessageBus</code>: <code>send()</code>, <code>broadcast()</code>, <code>subscribe()</code></li><li>Typed message envelopes</li><li>Async message delivery</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-7.6</span><span class="req-name">Async Execution</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support asynchronous task execution with callbacks, promises, or event-driven patterns.</div>
+      <ul class="req-details"><li><code>task.spawn()</code> returns a <code>JoinHandle</code></li><li>Callback on completion: <code>on_success()</code>, <code>on_failure()</code></li><li>Event stream for pipeline progress</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-8.5</span><span class="req-name">Structured Data</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support structured data inputs/outputs (JSON, tables, CSV) with schema validation and transformation.</div>
+      <ul class="req-details"><li>Parse CSV/JSON/tabular data as input</li><li>Schema inference from data samples</li><li>Format conversion between structured types</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-8.2</span><span class="req-name">Image Generation</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support image generation and editing through integration with models like DALL-E, Stable Diffusion, and Midjourney.</div>
+      <ul class="req-details"><li><code>ImageGenerator</code> trait: <code>generate()</code>, <code>edit()</code>, <code>vary()</code></li><li>Provider implementations: DALL-E, Stability AI</li><li>Image message type for agent consumption</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-8.3</span><span class="req-name">Audio Processing</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support speech-to-text (transcription) and text-to-speech (synthesis) with multiple voice options.</div>
+      <ul class="req-details"><li><code>Transcriber</code> trait: <code>transcribe(audio) -&gt; text</code></li><li><code>Synthesizer</code> trait: <code>synthesize(text) -&gt; audio</code></li><li>Provider: OpenAI Whisper, ElevenLabs, Google TTS</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-10.1</span><span class="req-name">Benchmarking</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL provide benchmarking tools to evaluate model performance across standard datasets and custom evaluation sets.</div>
+      <ul class="req-details"><li>Run evaluation dataset against configured agents</li><li>Accuracy, latency, cost metrics per run</li><li>Compare results across runs</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-10.2</span><span class="req-name">A/B Testing</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support A/B testing of prompts, models, and agent configurations with statistical significance analysis.</div>
+      <ul class="req-details"><li>Variant assignment and traffic splitting</li><li>Metric collection per variant</li><li>Statistical significance calculator</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-10.3</span><span class="req-name">Regression Testing</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support automated regression testing for agent behavior, detecting drift in output quality over time.</div>
+      <ul class="req-details"><li>Golden dataset with expected outputs</li><li>Semantic similarity scoring for regression detection</li><li>CI integration with pass/fail thresholds</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-10.5</span><span class="req-name">Quality Metrics</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL compute quality metrics: relevance, faithfulness, coherence, fluency, and custom scorer functions.</div>
+      <ul class="req-details"><li><code>Scorer</code> trait: <code>score(input, output, context) -&gt; f64</code></li><li>Built-in scorers: relevance, faithfulness, length</li><li>LLM-as-judge scorer implementation</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-11.3</span><span class="req-name">Metrics</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL expose metrics: request latency (p50, p95, p99), token throughput, error rates, and cache hit rates.</div>
+      <ul class="req-details"><li>Prometheus-compatible metrics endpoint</li><li>Histograms for latency, counters for tokens/errors</li><li>Per-provider, per-model, per-agent dimensions</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-11.4</span><span class="req-name">Debugging Tools</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL provide debugging tools to inspect agent reasoning, tool calls, prompt assembly, and context window usage.</div>
+      <ul class="req-details"><li>Step-through agent execution with breakpoints</li><li>Prompt preview before sending to LLM</li><li>Context window visualization (token budget usage)</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-13.2</span><span class="req-name">Content Filtering</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support configurable content filtering for both inputs and outputs based on severity categories.</div>
+      <ul class="req-details"><li>Category-based filter: violence, hate, sexual, self-harm</li><li>Configurable severity thresholds (block, warn, allow)</li><li>Custom filter rules via regex or ML classifier</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-13.3</span><span class="req-name">PII Handling</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL detect and optionally redact PII (personally identifiable information) from prompts and responses.</div>
+      <ul class="req-details"><li>Pattern-based detection: SSN, email, phone, credit card</li><li>Configurable action: redact, hash, warn, block</li><li>Custom entity patterns</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-14.2</span><span class="req-name">Horizontal Scaling</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support horizontal scaling through stateless worker nodes and distributed task queues.</div>
+      <ul class="req-details"><li>Externalize all state (memory, config) to shared stores</li><li>Task queue integration: Redis, RabbitMQ</li><li>Worker registration and health monitoring</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-15.2</span><span class="req-name">CLI Tools</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL provide CLI tools for project scaffolding, agent management, testing, and deployment.</div>
+      <ul class="req-details"><li><code>ai-frame new &lt;project&gt;</code> &mdash; scaffold project</li><li><code>ai-frame run &lt;agent&gt;</code> &mdash; run an agent</li><li><code>ai-frame test &lt;suite&gt;</code> &mdash; run evaluation</li><li><code>ai-frame deploy</code> &mdash; deploy API server</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-16.2</span><span class="req-name">Container Support</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL provide Docker images and docker-compose configurations for easy deployment.</div>
+      <ul class="req-details"><li>Multi-stage Dockerfile (build + runtime)</li><li>docker-compose with API server + dependencies</li><li>Configuration via environment variables</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-17.1</span><span class="req-name">Data Sources</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL integrate with common data sources: databases (SQL, NoSQL), file systems, APIs, message queues.</div>
+      <ul class="req-details"><li><code>DataSource</code> trait: <code>read()</code>, <code>write()</code></li><li>SQL: PostgreSQL, MySQL, SQLite</li><li>NoSQL: MongoDB, Redis</li><li>File: local, S3, GCS</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-17.2</span><span class="req-name">Communication Platforms</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL provide connectors for communication platforms: Slack, Discord, Email, SMS, WhatsApp.</div>
+      <ul class="req-details"><li><code>Channel</code> trait: <code>send()</code>, <code>receive()</code></li><li>Slack, Discord, Email (SMTP/IMAP), Twilio SMS</li><li>Message normalization across platforms</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-17.3</span><span class="req-name">MCP Support</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support the Model Context Protocol (MCP) for standardized tool and resource integration.</div>
+      <ul class="req-details"><li>MCP client for discovering and calling external tools</li><li>MCP server for exposing framework tools</li><li>Transport: stdio, HTTP/SSE</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-18.1</span><span class="req-name">Model Routing</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL support intelligent model routing based on task complexity, directing simple queries to cheaper/faster models and complex queries to more capable ones.</div>
+      <ul class="req-details"><li><code>Router</code> trait: <code>route(prompt, context) -&gt; model</code></li><li>Rule-based routing (keyword, length, task type)</li><li>LLM-based complexity classifier</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="medium">
+      <div class="req-head"><span class="req-id">REQ-18.2</span><span class="req-name">Token Optimization</span><span class="difficulty medium">Medium</span></div>
+      <div class="req-body">The framework SHALL optimize token usage through prompt compression, context pruning, and response length control.</div>
+      <ul class="req-details"><li>Prompt compression: remove redundancy, shorten instructions</li><li>Context pruning: drop low-relevance history entries</li><li>Max token enforcement on responses</li></ul>
+    </div>
+
+    <!-- Hard items -->
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-1.5</span><span class="req-name">Embedding Generation</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL provide embedding generation for text, images, and other modalities through a provider-agnostic interface.</div>
+      <ul class="req-details"><li><code>Embedder</code> trait: <code>embed(text) -&gt; Vec&lt;f32&gt;</code></li><li>Providers: OpenAI, Cohere, local (ONNX)</li><li>Batch embedding with rate limiting</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-3.6</span><span class="req-name">Sandboxed Execution</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support sandboxed tool execution with configurable permissions and resource limits.</div>
+      <ul class="req-details"><li>Sandbox backends: Docker, WASM, native (seccomp)</li><li>Permission model: filesystem, network, compute limits</li><li>Timeout and memory limits per tool execution</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-5.3</span><span class="req-name">Knowledge Base</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support building and querying knowledge bases from documents with automatic chunking and indexing.</div>
+      <ul class="req-details"><li><code>KnowledgeBase</code> builder: <code>.add_document()</code>, <code>.build()</code>, <code>.query()</code></li><li>Automatic ingestion pipeline: parse &rarr; chunk &rarr; embed &rarr; index</li><li>Incremental updates (add/remove documents)</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-8.4</span><span class="req-name">Video Understanding</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support video analysis including frame extraction, temporal understanding, and scene description.</div>
+      <ul class="req-details"><li>Frame extraction at configurable intervals</li><li>Multi-frame analysis with temporal context</li><li>Scene boundary detection</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-11.5</span><span class="req-name">Observability Platform Integration</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL integrate with observability platforms (LangSmith, W&B, OpenTelemetry, Datadog) through standard interfaces.</div>
+      <ul class="req-details"><li>OpenTelemetry exporter (traces + metrics)</li><li>LangSmith integration for prompt/trace tracking</li><li>Pluggable exporter interface</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-12.2</span><span class="req-name">Semantic Caching</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support semantic caching, returning cached responses for semantically similar queries (not just exact matches).</div>
+      <ul class="req-details"><li>Embed incoming query and compare against cached query embeddings</li><li>Configurable similarity threshold</li><li>Cache eviction by recency and hit frequency</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-12.5</span><span class="req-name">Connection Pooling</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL manage HTTP connection pools and persistent connections to LLM providers for optimal throughput.</div>
+      <ul class="req-details"><li>Per-provider connection pool with configurable size</li><li>Keep-alive and connection reuse</li><li>Automatic reconnection on failure</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-13.4</span><span class="req-name">Access Control</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support role-based access control for agents, tools, models, and knowledge bases.</div>
+      <ul class="req-details"><li>Role definitions: admin, developer, user, agent</li><li>Permission matrix: who can use which tools, models, data</li><li>Policy enforcement at agent and pipeline level</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-13.5</span><span class="req-name">Audit Trail</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL maintain an immutable audit trail of all agent actions, tool calls, and data access.</div>
+      <ul class="req-details"><li>Append-only log of every action</li><li>Structured format: timestamp, agent, action, input/output hash</li><li>Queryable with retention policy</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-14.3</span><span class="req-name">Resource Management</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL manage computational resources (GPU memory, API quotas, database connections) with pooling and recycling.</div>
+      <ul class="req-details"><li>Resource pool with checkout/checkin</li><li>Quota tracking per provider (API limits)</li><li>Automatic cleanup of idle resources</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-14.4</span><span class="req-name">Batch Processing</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support batch processing of requests for high-throughput scenarios.</div>
+      <ul class="req-details"><li>Batch submission with automatic grouping</li><li>Provider batch APIs where available (OpenAI batch)</li><li>Progress tracking and partial failure handling</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-16.3</span><span class="req-name">Cloud Deployment</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support deployment to major cloud providers (AWS, GCP, Azure) with infrastructure-as-code templates.</div>
+      <ul class="req-details"><li>Terraform/Pulumi modules for each cloud</li><li>Managed service integration (RDS, S3, ElastiCache)</li><li>Autoscaling configuration</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-16.4</span><span class="req-name">Serverless Support</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support serverless deployment for event-driven and low-cost workloads.</div>
+      <ul class="req-details"><li>AWS Lambda, Google Cloud Functions, Azure Functions</li><li>Cold-start optimization (minimal initialization)</li><li>Event triggers: HTTP, queue, schedule</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-17.4</span><span class="req-name">LangChain Compatibility</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHOULD provide compatibility layers or adapters for the LangChain ecosystem (chains, agents, tools).</div>
+      <ul class="req-details"><li>Adapter: LangChain tool &rarr; framework tool</li><li>Adapter: framework agent &rarr; LangChain chain</li><li>Python bridge via PyO3 (if needed)</li></ul>
+    </div>
+
+    <div class="req-card" data-diff="hard">
+      <div class="req-head"><span class="req-id">REQ-18.3</span><span class="req-name">Budget Management</span><span class="difficulty hard">Hard</span></div>
+      <div class="req-body">The framework SHALL support budget limits per project, per agent, and per user with automatic enforcement and alerts.</div>
+      <ul class="req-details"><li>Budget definitions with period (daily, monthly)</li><li>Real-time spend tracking against budget</li><li>Actions on limit: warn, throttle, block</li><li>Alert callbacks for integration with monitoring</li></ul>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-section">
+    <h2>Summary</h2>
+    <table>
+      <thead>
+        <tr><th>Phase</th><th>Priority</th><th>Requirements</th><th>Difficulty Range</th><th>When to Build</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong style="color:var(--accent)">Phase 1</strong></td><td>P0 &mdash; Core</td><td>13 requirements</td><td>Easy &rarr; Medium</td><td>Weeks 1&ndash;4</td></tr>
+        <tr><td><strong style="color:var(--blue)">Phase 2</strong></td><td>P1 &mdash; Essential</td><td>24 requirements</td><td>Easy &rarr; Hard</td><td>Weeks 5&ndash;12</td></tr>
+        <tr><td><strong style="color:var(--green)">Phase 3</strong></td><td>P2 &mdash; Advanced</td><td>48 requirements</td><td>Easy &rarr; Hard</td><td>Weeks 13+</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    <p>AI Framework Requirements &mdash; Generated 2026-05-13</p>
+  </footer>
+</div>
+
+<script>
+// --- Theme ---
+function toggleTheme() {
+  const body = document.body;
+  if (body.getAttribute('data-theme') === 'light') {
+    body.removeAttribute('data-theme');
+    localStorage.setItem('theme', 'dark');
+  } else {
+    body.setAttribute('data-theme', 'light');
+    localStorage.setItem('theme', 'light');
+  }
+}
+if (localStorage.getItem('theme') === 'light') {
+  document.body.setAttribute('data-theme', 'light');
+}
+
+// --- Done state ---
+const DONE_KEY = 'ai-req-done';
+
+function getDoneMap() {
+  try { return JSON.parse(localStorage.getItem(DONE_KEY) || '{}'); } catch { return {}; }
+}
+function saveDoneMap(map) {
+  localStorage.setItem(DONE_KEY, JSON.stringify(map));
+}
+
+function getPhaseForCard(card) {
+  const phase = card.closest('.phase');
+  if (!phase) return null;
+  if (phase.id === 'phase1') return 'p1';
+  if (phase.id === 'phase2') return 'p2';
+  if (phase.id === 'phase3') return 'p3';
+  return null;
+}
+
+const PHASE_TOTALS = { p1: 13, p2: 24, p3: 48 };
+
+function updateStats() {
+  const map = getDoneMap();
+  const cards = document.querySelectorAll('.req-card');
+  let totalDone = 0;
+  const phaseDone = { p1: 0, p2: 0, p3: 0 };
+
+  cards.forEach(card => {
+    const id = card.dataset.reqId;
+    const phase = getPhaseForCard(card);
+    if (map[id]) {
+      totalDone++;
+      if (phase) phaseDone[phase]++;
+    }
+  });
+
+  document.getElementById('done-count').textContent = totalDone + ' / 85';
+  document.getElementById('done-bar').style.width = ((totalDone / 85) * 100).toFixed(1) + '%';
+  document.getElementById('p1-count').textContent = phaseDone.p1 + ' / 13';
+  document.getElementById('p2-count').textContent = phaseDone.p2 + ' / 24';
+  document.getElementById('p3-count').textContent = phaseDone.p3 + ' / 48';
+}
+
+function toggleDone(reqId) {
+  const map = getDoneMap();
+  map[reqId] = !map[reqId];
+  if (!map[reqId]) delete map[reqId];
+  saveDoneMap(map);
+  applyDoneState(reqId);
+  updateStats();
+}
+
+function applyDoneState(reqId) {
+  const map = getDoneMap();
+  const card = document.querySelector(`.req-card[data-req-id="${reqId}"]`);
+  if (!card) return;
+  const badge = card.querySelector('.status-toggle');
+  const isDone = !!map[reqId];
+  if (isDone) {
+    card.classList.add('is-done');
+    badge.classList.remove('not-done');
+    badge.classList.add('done');
+    badge.innerHTML = '<span class="check-icon">&#10003;</span> Done';
+  } else {
+    card.classList.remove('is-done');
+    badge.classList.remove('done');
+    badge.classList.add('not-done');
+    badge.innerHTML = '<span class="check-icon">&nbsp;</span> Not Done';
+  }
+}
+
+// --- Init: inject badges ---
+function initBadges() {
+  const map = getDoneMap();
+  document.querySelectorAll('.req-card').forEach(card => {
+    const reqIdEl = card.querySelector('.req-id');
+    if (!reqIdEl) return;
+    const reqId = reqIdEl.textContent.trim();
+    card.dataset.reqId = reqId;
+
+    const badge = document.createElement('span');
+    badge.className = 'status-toggle not-done';
+    badge.innerHTML = '<span class="check-icon">&nbsp;</span> Not Done';
+    badge.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleDone(reqId);
+    });
+    card.querySelector('.req-head').appendChild(badge);
+
+    if (map[reqId]) applyDoneState(reqId);
+  });
+  updateStats();
+}
+
+// --- Filter ---
+let currentFilter = 'all';
+
+function filterCards(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const map = getDoneMap();
+  document.querySelectorAll('.req-card').forEach(card => {
+    let show = false;
+    const diff = card.dataset.diff;
+    const isDone = !!map[card.dataset.reqId];
+
+    if (filter === 'all') show = true;
+    else if (filter === 'done') show = isDone;
+    else if (filter === 'todo') show = !isDone;
+    else show = (diff === filter);
+
+    card.style.display = show ? '' : 'none';
+  });
+}
+
+// Boot
+initBadges();
+</script>
+</body>
+</html>

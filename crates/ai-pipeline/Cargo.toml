@@ -1,0 +1,16 @@
+[package]
+name = "ai-pipeline"
+version = "0.1.0"
+edition = "2021"
+description = "Workflow orchestration: sequential, parallel, conditional, DAG pipelines"
+
+[dependencies]
+ai-core = { path = "../ai-core" }
+ai-agent = { path = "../ai-agent" }
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

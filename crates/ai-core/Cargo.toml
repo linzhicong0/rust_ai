@@ -1,0 +1,20 @@
+[package]
+name = "ai-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core traits, types, and configuration for the AI framework"
+
+[dependencies]
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+config = { workspace = true }
+dotenvy = { workspace = true }
+tera = { workspace = true }
+schemars = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }

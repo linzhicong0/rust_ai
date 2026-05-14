@@ -1,0 +1,13 @@
+[package]
+name = "ai-tools-macros"
+version = "0.1.0"
+edition = "2021"
+description = "Procedural macros for #[tool] and #[agent] derive"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }

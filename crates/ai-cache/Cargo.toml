@@ -1,0 +1,15 @@
+[package]
+name = "ai-cache"
+version = "0.1.0"
+edition = "2021"
+description = "Caching layer: response cache and semantic cache"
+
+[dependencies]
+ai-core = { path = "../ai-core" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+moka = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

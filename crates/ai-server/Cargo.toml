@@ -1,0 +1,19 @@
+[package]
+name = "ai-server"
+version = "0.1.0"
+edition = "2021"
+description = "REST API server built with Axum"
+
+[dependencies]
+ai-core = { path = "../ai-core" }
+ai-agent = { path = "../ai-agent" }
+ai-pipeline = { path = "../ai-pipeline" }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }

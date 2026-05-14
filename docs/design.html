@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Framework — Rust Technical Design</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-card-hover: #222638;
+    --bg-phase: #141720;
+    --border: #2a2e3e;
+    --border-light: #353a50;
+    --text: #e2e4ed;
+    --text-muted: #8b90a5;
+    --text-dim: #5c6078;
+    --accent: #7c6aef;
+    --accent-light: #9d8df5;
+    --accent-bg: rgba(124,106,239,0.08);
+    --green: #4ade80;
+    --green-bg: rgba(74,222,128,0.1);
+    --yellow: #fbbf24;
+    --yellow-bg: rgba(251,191,36,0.1);
+    --red: #f87171;
+    --red-bg: rgba(248,113,113,0.1);
+    --blue: #60a5fa;
+    --blue-bg: rgba(96,165,250,0.1);
+    --code-bg: #12141e;
+    --code-text: #c9d1d9;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+
+  [data-theme="light"] {
+    --bg: #f8f9fc;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f5f6fa;
+    --bg-phase: #f0f1f6;
+    --border: #e2e4ed;
+    --border-light: #d0d3e0;
+    --text: #1a1d2e;
+    --text-muted: #5c6078;
+    --text-dim: #8b90a5;
+    --accent: #6c5ce7;
+    --accent-light: #7c6aef;
+    --accent-bg: rgba(108,92,231,0.06);
+    --green-bg: rgba(34,197,94,0.08);
+    --yellow-bg: rgba(234,179,8,0.08);
+    --red-bg: rgba(239,68,68,0.08);
+    --blue-bg: rgba(59,130,246,0.08);
+    --code-bg: #f1f3f9;
+    --code-text: #374151;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Header */
+  header {
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+
+  header h1 span { color: var(--accent); }
+
+  header p {
+    color: var(--text-muted);
+    margin-top: 8px;
+    font-size: 1rem;
+  }
+
+  .theme-toggle {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* TOC */
+  .toc {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 40px;
+    box-shadow: var(--shadow);
+  }
+
+  .toc h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .toc-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+  }
+
+  .toc-links a {
+    color: var(--accent-light);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(124,106,239,0.2);
+    transition: all 0.2s;
+    display: block;
+  }
+  .toc-links a:hover {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+  }
+
+  /* Section cards */
+  .section {
+    margin-bottom: 56px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .section-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .section-badge.s1 { background: var(--accent-bg); color: var(--accent-light); border: 1px solid rgba(124,106,239,0.25); }
+  .section-badge.s2 { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(96,165,250,0.25); }
+  .section-badge.s3 { background: var(--green-bg); color: var(--green); border: 1px solid rgba(74,222,128,0.25); }
+  .section-badge.s4 { background: var(--yellow-bg); color: var(--yellow); border: 1px solid rgba(251,191,36,0.25); }
+  .section-badge.s5 { background: var(--accent-bg); color: var(--accent-light); border: 1px solid rgba(124,106,239,0.25); }
+  .section-badge.s6 { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(96,165,250,0.25); }
+  .section-badge.s7 { background: var(--green-bg); color: var(--green); border: 1px solid rgba(74,222,128,0.25); }
+  .section-badge.s8 { background: var(--yellow-bg); color: var(--yellow); border: 1px solid rgba(251,191,36,0.25); }
+
+  .section-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .section-desc {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.92rem;
+    margin-bottom: 24px;
+    padding-left: 4px;
+  }
+
+  /* Content card */
+  .content-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    transition: all 0.2s;
+    box-shadow: var(--shadow);
+  }
+  .content-card:hover {
+    border-color: var(--border-light);
+    background: var(--bg-card-hover);
+  }
+
+  .content-card h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+
+  .content-card h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--accent-light);
+    margin-top: 16px;
+    margin-bottom: 8px;
+  }
+
+  .content-card p, .content-card ul {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  .content-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0;
+  }
+
+  .content-card ul li {
+    position: relative;
+    padding-left: 18px;
+    line-height: 1.8;
+  }
+
+  .content-card ul li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.5;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  th {
+    background: var(--bg-card);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 14px 18px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 12px 18px;
+    font-size: 0.88rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--accent-bg); }
+
+  /* Code blocks */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+
+  pre code, code {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    color: var(--code-text);
+  }
+
+  /* Inline code */
+  p code, li code {
+    background: var(--code-bg);
+    color: var(--accent-light);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
+  }
+
+  /* Syntax highlighting colors */
+  .kw { color: #c678dd; }
+  .ty { color: #e5c07b; }
+  .fn-name { color: #61afef; }
+  .str { color: #98c379; }
+  .comment { color: #5c6370; font-style: italic; }
+  .macro { color: #56b6c2; }
+  .attr { color: #d19a66; }
+  .lifetime { color: #e06c75; }
+
+  [data-theme="light"] .kw { color: #a626a4; }
+  [data-theme="light"] .ty { color: #986801; }
+  [data-theme="light"] .fn-name { color: #4078f2; }
+  [data-theme="light"] .str { color: #50a14f; }
+  [data-theme="light"] .comment { color: #a0a1a7; font-style: italic; }
+  [data-theme="light"] .macro { color: #0184bc; }
+  [data-theme="light"] .attr { color: #986801; }
+  [data-theme="light"] .lifetime { color: #c45b00; }
+
+  /* Footer */
+  footer {
+    margin-top: 64px;
+    padding: 24px 0;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    header h1 { font-size: 1.5rem; }
+    .content-card { padding: 16px; }
+    .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    table { font-size: 0.82rem; }
+    th, td { padding: 10px 12px; }
+    pre { padding: 14px 16px; }
+    pre code { font-size: 0.75rem; }
+    .toc-links { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="header-row">
+      <div>
+        <h1>AI Framework <span>Technical Design</span></h1>
+        <p>Rust implementation design — crate selection, core traits, architecture, and key decisions.</p>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()">&#9790; Toggle Theme</button>
+    </div>
+  </header>
+
+  <!-- TOC -->
+  <div class="toc">
+    <h3>Jump to Section</h3>
+    <div class="toc-links">
+      <a href="#s1">1. Crate Selection</a>
+      <a href="#s2">2. Core Trait Hierarchy</a>
+      <a href="#s3">3. Reqwest HTTP Client</a>
+      <a href="#s4">4. Rust Language Features</a>
+      <a href="#s5">5. Project Structure</a>
+      <a href="#s6">6. Workspace Cargo.toml</a>
+      <a href="#s7">7. Build Phases</a>
+      <a href="#s8">8. Key Design Decisions</a>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 1 ==================== -->
+  <div class="section" id="s1">
+    <div class="section-header">
+      <span class="section-badge s1">&#9670; S1</span>
+      <span class="section-title">Crate Selection</span>
+    </div>
+    <p class="section-desc">External Rust crates chosen for each domain of the framework.</p>
+
+    <div class="content-card">
+      <table>
+        <thead>
+          <tr><th>Domain</th><th>Crate</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Async Runtime</td><td><code>tokio</code></td><td>Async I/O, task spawning, channels, timers</td></tr>
+          <tr><td>HTTP Client</td><td><code>reqwest</code></td><td>Call LLM provider APIs (OpenAI, Anthropic, Google)</td></tr>
+          <tr><td>HTTP Server</td><td><code>axum</code></td><td>Expose framework as REST API</td></tr>
+          <tr><td>Serialization</td><td><code>serde</code> + <code>serde_json</code></td><td>JSON serialize/deserialize everywhere</td></tr>
+          <tr><td>Error Handling</td><td><code>thiserror</code></td><td>Typed, ergonomic error enums for the library</td></tr>
+          <tr><td>Logging/Tracing</td><td><code>tracing</code> + <code>tracing-subscriber</code></td><td>Structured logging, spans, distributed tracing</td></tr>
+          <tr><td>Configuration</td><td><code>config</code> + <code>dotenvy</code></td><td>Layered config: defaults &lt; file &lt; env &lt; code</td></tr>
+          <tr><td>CLI</td><td><code>clap</code></td><td>CLI tools: scaffold, run, test, deploy</td></tr>
+          <tr><td>Template</td><td><code>tera</code></td><td>Prompt templates with <code>{{var}}</code>, conditionals, inheritance</td></tr>
+          <tr><td>Schema</td><td><code>schemars</code> + <code>jsonschema</code></td><td>JSON Schema generation and validation</td></tr>
+          <tr><td>Caching</td><td><code>moka</code></td><td>Concurrent async LRU/TTL cache</td></tr>
+          <tr><td>Streams</td><td><code>futures</code> + <code>tokio-stream</code></td><td>Stream trait, async iterators for streaming responses</td></tr>
+          <tr><td>Concurrency</td><td><code>tokio::sync</code></td><td>Semaphore, Mutex, RwLock, broadcast, mpsc</td></tr>
+          <tr><td>Database</td><td><code>sqlx</code></td><td>PostgreSQL, MySQL, SQLite (async, compile-time checked)</td></tr>
+          <tr><td>Vector Search</td><td><code>qdrant-client</code></td><td>Vector database client for RAG</td></tr>
+          <tr><td>Embeddings (local)</td><td><code>ort</code> + <code>ndarray</code></td><td>ONNX Runtime for local embedding inference</td></tr>
+          <tr><td>Process Isolation</td><td><code>wasmtime</code></td><td>WASM sandbox for untrusted tool execution</td></tr>
+          <tr><td>Async Trait</td><td><code>async-trait</code></td><td>Async methods in trait definitions</td></tr>
+          <tr><td>Builder</td><td><code>derive_builder</code> or typed-builder</td><td>Builder pattern for config structs</td></tr>
+          <tr><td>Macros</td><td><code>proc-macro2</code> + <code>quote</code> + <code>syn</code></td><td>Custom derive macros for Tool, Agent</td></tr>
+          <tr><td>Container</td><td><code>docker-api</code> or Bollard</td><td>Docker integration for sandboxed execution</td></tr>
+          <tr><td>Observability</td><td><code>opentelemetry</code> + <code>tracing-opentelemetry</code></td><td>OpenTelemetry export (traces + metrics)</td></tr>
+          <tr><td>Testing</td><td><code>tokio::test</code>, <code>proptest</code></td><td>Async tests + property-based testing</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 2 ==================== -->
+  <div class="section" id="s2">
+    <div class="section-header">
+      <span class="section-badge s2">&#9670; S2</span>
+      <span class="section-title">Core Trait Hierarchy</span>
+    </div>
+    <p class="section-desc">The framework is built around a small set of core traits. Every major component is a trait with multiple implementations.</p>
+
+    <div class="content-card">
+      <h3>Trait Hierarchy Overview</h3>
+<pre><code>Provider                    Tool                     Memory
+├── OpenAiProvider          ├── FnTool (closure)     ├── InMemoryMemory
+├── AnthropicProvider       ├── FileReadTool         ├── SqlMemory
+├── GoogleProvider          ├── HttpFetchTool        ├── VectorMemory
+└── OllamaProvider          └── ShellExecTool        └── RedisMemory
+
+Agent                       Pipeline                 Embedder
+├── Agent&lt;Provider, Mem&gt;    ├── SequentialPipeline   ├── OpenAiEmbedder
+└── (generic over           ├── ParallelPipeline     ├── CohereEmbedder
+    Provider + Memory)      └── DagPipeline          └── LocalEmbedder (ort)</code></pre>
+    </div>
+
+    <!-- 2.1 Provider -->
+    <div class="content-card">
+      <h3>2.1 Provider Trait (LLM Access)</h3>
+<pre><code>use async_trait::async_trait;
+use futures::stream::BoxStream;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelConfig {
+    pub model: String,
+    pub temperature: Option&lt;f64&gt;,
+    pub max_tokens: Option&lt;u32&gt;,
+    pub top_p: Option&lt;f64&gt;,
+    pub frequency_penalty: Option&lt;f64&gt;,
+    pub presence_penalty: Option&lt;f64&gt;,
+    pub stop_sequences: Option&lt;Vec&lt;String&gt;&gt;,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Message {
+    pub role: Role,
+    pub content: Content,
+}
+
+pub enum Role {
+    System,
+    User,
+    Assistant,
+    Tool,
+}
+
+pub enum Content {
+    Text(String),
+    MultiPart(Vec&lt;ContentPart&gt;),  // for vision: text + image
+}
+
+pub enum ContentPart {
+    Text(String),
+    Image { url: String, media_type: String },
+}
+
+#[derive(Debug)]
+pub struct Usage {
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
+}
+
+#[derive(Debug)]
+pub struct CompletionResponse {
+    pub content: String,
+    pub tool_calls: Vec&lt;ToolCall&gt;,
+    pub usage: Usage,
+    pub finish_reason: FinishReason,
+}
+
+#[derive(Debug)]
+pub struct StreamChunk {
+    pub delta: Option&lt;String&gt;,
+    pub tool_call_delta: Option&lt;ToolCallDelta&gt;,
+    pub finish_reason: Option&lt;FinishReason&gt;,
+    pub usage: Option&lt;Usage&gt;,
+}
+
+#[async_trait]
+pub trait Provider: Send + Sync {
+    async fn complete(
+        &amp;self,
+        messages: Vec&lt;Message&gt;,
+        config: &amp;ModelConfig,
+        tools: &amp;[ToolDescriptor],
+    ) -&gt; Result&lt;CompletionResponse, ProviderError&gt;;
+
+    fn stream(
+        &amp;self,
+        messages: Vec&lt;Message&gt;,
+        config: &amp;ModelConfig,
+        tools: &amp;[ToolDescriptor],
+    ) -&gt; BoxStream&lt;'static, Result&lt;StreamChunk, ProviderError&gt;&gt;;
+
+    async fn embed(&amp;self, texts: Vec&lt;String&gt;) -&gt; Result&lt;Vec&lt;Vec&lt;f32&gt;&gt;, ProviderError&gt;;
+
+    fn name(&amp;self) -&gt; &amp;str;
+}</code></pre>
+
+      <h4>Rust features used:</h4>
+      <ul>
+        <li><code>async_trait</code> — async methods in traits (until RPITIT stabilizes)</li>
+        <li><code>BoxStream</code> — trait-object streaming return (avoids naming the concrete stream type)</li>
+        <li><code>enum</code> — sum types for <code>Content</code>, <code>Role</code>, <code>FinishReason</code></li>
+        <li><code>#[derive(Serialize, Deserialize)]</code> — serde derives for config types</li>
+        <li><code>Result&lt;T, E&gt;</code> — typed error propagation</li>
+      </ul>
+
+      <h4>Reqwest usage in Provider implementations:</h4>
+<pre><code>pub struct OpenAiProvider {
+    client: reqwest::Client,       // connection pooling built-in
+    api_key: String,
+    base_url: String,
+}
+
+#[async_trait]
+impl Provider for OpenAiProvider {
+    async fn complete(
+        &amp;self,
+        messages: Vec&lt;Message&gt;,
+        config: &amp;ModelConfig,
+        tools: &amp;[ToolDescriptor],
+    ) -&gt; Result&lt;CompletionResponse, ProviderError&gt; {
+        let body = self.build_request_body(messages, config, tools);
+
+        let response = self.client
+            .post(format!("{}/chat/completions", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .json(&amp;body)
+            .send()
+            .await
+            .map_err(ProviderError::Http)?;
+
+        let status = response.status();
+        let body = response.text().await.map_err(ProviderError::Http)?;
+
+        if !status.is_success() {
+            return Err(ProviderError::Api { status, body });
+        }
+
+        serde_json::from_str(&amp;body).map_err(ProviderError::Deserialize)
+    }
+
+    fn stream(
+        &amp;self,
+        messages: Vec&lt;Message&gt;,
+        config: &amp;ModelConfig,
+        tools: &amp;[ToolDescriptor],
+    ) -&gt; BoxStream&lt;'static, Result&lt;StreamChunk, ProviderError&gt;&gt; {
+        // reqwest streaming: response.bytes_stream()
+        // converted to BoxStream via try_stream! macro from futures
+        todo!()
+    }
+}</code></pre>
+    </div>
+
+    <!-- 2.2 Tool -->
+    <div class="content-card">
+      <h3>2.2 Tool Trait</h3>
+<pre><code>use schemars::JsonSchema;
+use serde_json::Value;
+
+pub struct ToolDescriptor {
+    pub name: String,
+    pub description: String,
+    pub input_schema: Value,  // JSON Schema
+}
+
+pub struct ToolOutput {
+    pub content: String,
+    pub is_error: bool,
+}
+
+#[async_trait]
+pub trait Tool: Send + Sync {
+    fn descriptor(&amp;self) -&gt; ToolDescriptor;
+    async fn execute(&amp;self, input: Value) -&gt; Result&lt;ToolOutput, ToolError&gt;;
+}</code></pre>
+
+      <h4>Ergonomic macro for defining tools:</h4>
+<pre><code>// Usage:
+#[tool(description = "Search the web for information")]
+async fn web_search(
+    #[tool(desc = "Search query")] query: String,
+    #[tool(desc = "Max results")] max_results: Option&lt;u32&gt;,
+) -&gt; Result&lt;String, ToolError&gt; {
+    // implementation
+}
+
+// The macro generates:
+// 1. JSON Schema from parameter types (via schemars)
+// 2. ToolDescriptor with name, description, schema
+// 3. Tool trait implementation
+// 4. Input deserialization from Value</code></pre>
+    </div>
+
+    <!-- 2.3 Memory -->
+    <div class="content-card">
+      <h3>2.3 Memory Trait</h3>
+<pre><code>#[derive(Debug, Clone)]
+pub struct MemoryEntry {
+    pub role: Role,
+    pub content: String,
+    pub timestamp: chrono::DateTime&lt;chrono::Utc&gt;,
+    pub metadata: HashMap&lt;String, Value&gt;,
+}
+
+#[async_trait]
+pub trait Memory: Send + Sync {
+    async fn add(&amp;self, entry: MemoryEntry) -&gt; Result&lt;(), MemoryError&gt;;
+    async fn get(&amp;self, limit: Option&lt;usize&gt;) -&gt; Result&lt;Vec&lt;MemoryEntry&gt;, MemoryError&gt;;
+    async fn search(&amp;self, query: &amp;str, limit: usize) -&gt; Result&lt;Vec&lt;MemoryEntry&gt;, MemoryError&gt;;
+    async fn clear(&amp;self) -&gt; Result&lt;(), MemoryError&gt;;
+}
+
+// In-memory implementation
+pub struct InMemoryMemory {
+    entries: tokio::sync::RwLock&lt;Vec&lt;MemoryEntry&gt;&gt;,
+    max_entries: usize,
+}</code></pre>
+    </div>
+
+    <!-- 2.4 Agent -->
+    <div class="content-card">
+      <h3>2.4 Agent</h3>
+<pre><code>pub struct AgentBuilder&lt;P, M&gt;
+where
+    P: Provider,
+    M: Memory,
+{
+    provider: P,
+    memory: M,
+    role: Option&lt;String&gt;,
+    goal: Option&lt;String&gt;,
+    backstory: Option&lt;String&gt;,
+    tools: Vec&lt;Box&lt;dyn Tool&gt;&gt;,
+    model_config: ModelConfig,
+    max_iterations: u32,
+}
+
+pub struct Agent&lt;P, M&gt;
+where
+    P: Provider,
+    M: Memory,
+{
+    inner: Arc&lt;AgentInner&lt;P, M&gt;&gt;,
+}
+
+impl&lt;P, M&gt; Agent&lt;P, M&gt;
+where
+    P: Provider,
+    M: Memory,
+{
+    pub async fn run(&amp;self, input: impl Into&lt;String&gt;) -&gt; Result&lt;AgentOutput, AgentError&gt; {
+        // ReAct loop: Reason → Act (tool call) → Observe → repeat
+        let mut messages = self.build_messages(input).await?;
+
+        for _ in 0..self.inner.max_iterations {
+            let response = self.inner.provider
+                .complete(messages.clone(), &amp;self.inner.model_config, &amp;self.tool_descriptors())
+                .await?;
+
+            if response.tool_calls.is_empty() {
+                // No tool calls — agent is done
+                return Ok(AgentOutput { content: response.content });
+            }
+
+            // Execute tool calls
+            for tool_call in response.tool_calls {
+                let tool = self.find_tool(&amp;tool_call.name)?;
+                let result = tool.execute(tool_call.arguments).await?;
+                messages.push(Message::tool_result(tool_call.id, result.content));
+            }
+        }
+
+        Err(AgentError::MaxIterationsExceeded)
+    }
+
+    pub fn stream(&amp;self, input: impl Into&lt;String&gt;)
+        -&gt; BoxStream&lt;'static, Result&lt;AgentEvent, AgentError&gt;&gt;
+    {
+        // Streaming version of the ReAct loop
+        // Yields AgentEvent::Text, AgentEvent::ToolCall, AgentEvent::ToolResult
+        todo!()
+    }
+}</code></pre>
+
+      <h4>Rust features used:</h4>
+      <ul>
+        <li><strong>Generic type parameters</strong> <code>P: Provider, M: Memory</code> — swap implementations without touching agent logic</li>
+        <li><strong><code>Arc&lt;AgentInner&gt;</code></strong> — cheap clone, shared state across async tasks</li>
+        <li><strong>Builder pattern</strong> — <code>AgentBuilder</code> enforces required fields at compile time</li>
+        <li><strong><code>impl Into&lt;String&gt;</code></strong> — accept <code>&amp;str</code>, <code>String</code>, or any string-like type</li>
+        <li><strong><code>Box&lt;dyn Tool&gt;</code></strong> — heterogeneous tool collection via trait objects</li>
+      </ul>
+    </div>
+
+    <!-- 2.5 Pipeline -->
+    <div class="content-card">
+      <h3>2.5 Pipeline</h3>
+<pre><code>pub struct Pipeline {
+    steps: Vec&lt;Step&gt;,
+}
+
+pub struct Step {
+    pub name: String,
+    pub kind: StepKind,
+}
+
+pub enum StepKind {
+    // Single task run by an agent
+    Task {
+        agent: Arc&lt;dyn Runnable&gt;,
+        input_mapper: Box&lt;dyn Fn(&amp;PipelineContext) -&gt; String + Send + Sync&gt;,
+        output_key: String,
+    },
+    // Run multiple steps concurrently
+    Parallel(Vec&lt;Step&gt;),
+    // Conditional branching
+    Conditional {
+        condition: Box&lt;dyn Fn(&amp;PipelineContext) -&gt; bool + Send + Sync&gt;,
+        then_step: Box&lt;Step&gt;,
+        else_step: Option&lt;Box&lt;Step&gt;&gt;,
+    },
+    // Loop until condition met
+    Loop {
+        body: Box&lt;Step&gt;,
+        condition: Box&lt;dyn Fn(&amp;PipelineContext) -&gt; bool + Send + Sync&gt;,
+        max_iterations: u32,
+    },
+}
+
+pub struct PipelineContext {
+    data: HashMap&lt;String, Value&gt;,
+}
+
+impl Pipeline {
+    pub async fn execute(&amp;self, input: Value) -&gt; Result&lt;PipelineContext, PipelineError&gt; {
+        let mut ctx = PipelineContext::new(input);
+        for step in &amp;self.steps {
+            self.execute_step(step, &amp;mut ctx).await?;
+        }
+        Ok(ctx)
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 3 ==================== -->
+  <div class="section" id="s3">
+    <div class="section-header">
+      <span class="section-badge s3">&#9670; S3</span>
+      <span class="section-title">Reqwest — HTTP Client Architecture</span>
+    </div>
+    <p class="section-desc">Reqwest is the backbone for all LLM provider communication.</p>
+
+    <!-- 3.1 -->
+    <div class="content-card">
+      <h3>3.1 Connection Pooling (REQ-12.5)</h3>
+      <p>Reqwest's <code>Client</code> internally uses <code>hyper</code> with a connection pool. A single <code>Client</code> instance per provider:</p>
+<pre><code>pub struct ProviderPool {
+    clients: HashMap&lt;String, reqwest::Client&gt;,  // keyed by provider name
+}
+
+impl ProviderPool {
+    pub fn client_for(&amp;self, provider: &amp;str) -&gt; &amp;reqwest::Client {
+        self.clients.get(provider).expect("unknown provider")
+    }
+}</code></pre>
+      <ul>
+        <li>One <code>reqwest::Client</code> per provider = one connection pool</li>
+        <li>Reuse across all requests to the same provider</li>
+        <li>Configurable: <code>pool_max_idle_per_host</code>, <code>pool_idle_timeout</code>, <code>connect_timeout</code></li>
+      </ul>
+<pre><code>let client = reqwest::Client::builder()
+    .pool_max_idle_per_host(20)
+    .pool_idle_timeout(Duration::from_secs(90))
+    .connect_timeout(Duration::from_secs(10))
+    .timeout(Duration::from_secs(120))
+    .build()?;</code></pre>
+    </div>
+
+    <!-- 3.2 -->
+    <div class="content-card">
+      <h3>3.2 Streaming (REQ-1.4)</h3>
+<pre><code>fn stream_completion(
+    client: &amp;reqwest::Client,
+    url: &amp;str,
+    body: &amp;Value,
+    api_key: &amp;str,
+) -&gt; BoxStream&lt;'static, Result&lt;StreamChunk, ProviderError&gt;&gt; {
+    let client = client.clone();
+    let url = url.to_string();
+    let body = body.clone();
+    let api_key = api_key.to_string();
+
+    try_stream! {
+        let response = client
+            .post(&amp;url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .json(&amp;body)
+            .send()
+            .await?;
+
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            // Parse SSE format: "data: {...}\n\n"
+            for line in parse_sse_lines(&amp;chunk) {
+                if line == "data: [DONE]" { break; }
+                let parsed: StreamChunk = serde_json::from_str(&amp;line)?;
+                yield parsed;
+            }
+        }
+    }.boxed()
+}</code></pre>
+    </div>
+
+    <!-- 3.3 -->
+    <div class="content-card">
+      <h3>3.3 Retry and Error Handling (REQ-7.4)</h3>
+<pre><code>async fn request_with_retry(
+    client: &amp;reqwest::Client,
+    request: reqwest::RequestBuilder,
+    policy: &amp;RetryPolicy,
+) -&gt; Result&lt;reqwest::Response, ProviderError&gt; {
+    let mut attempt = 0;
+    loop {
+        let req = request.try_clone().ok_or(ProviderError::NotRetryable)?;
+        let result = req.send().await;
+
+        match result {
+            Ok(resp) if resp.status().is_success() =&gt; return Ok(resp),
+            Ok(resp) if is_retryable(resp.status()) &amp;&amp; attempt &lt; policy.max_retries =&gt; {
+                attempt += 1;
+                let delay = policy.backoff.delay(attempt);
+                tokio::time::sleep(delay).await;
+            }
+            Ok(resp) =&gt; {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                return Err(ProviderError::Api { status, body });
+            }
+            Err(e) if e.is_connect() &amp;&amp; attempt &lt; policy.max_retries =&gt; {
+                attempt += 1;
+                let delay = policy.backoff.delay(attempt);
+                tokio::time::sleep(delay).await;
+            }
+            Err(e) =&gt; return Err(ProviderError::Http(e)),
+        }
+    }
+}
+
+fn is_retryable(status: reqwest::StatusCode) -&gt; bool {
+    matches!(status.as_u16(), 429 | 500 | 502 | 503 | 504)
+}</code></pre>
+    </div>
+
+    <!-- 3.4 -->
+    <div class="content-card">
+      <h3>3.4 Cancellation (REQ-1.4)</h3>
+<pre><code>use tokio_util::sync::CancellationToken;
+
+async fn stream_with_cancellation(
+    client: &amp;reqwest::Client,
+    url: &amp;str,
+    body: &amp;Value,
+    token: CancellationToken,
+) -&gt; Result&lt;String, ProviderError&gt; {
+    tokio::select! {
+        result = do_stream(client, url, body) =&gt; result,
+        _ = token.cancelled() =&gt; Err(ProviderError::Cancelled),
+    }
+}</code></pre>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 4 ==================== -->
+  <div class="section" id="s4">
+    <div class="section-header">
+      <span class="section-badge s4">&#9670; S4</span>
+      <span class="section-title">Rust Language Features Used</span>
+    </div>
+    <p class="section-desc">Key Rust language features leveraged throughout the framework.</p>
+
+    <div class="content-card">
+      <table>
+        <thead>
+          <tr><th>Rust Feature</th><th>Framework Usage</th><th>Requirements Served</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Traits</strong></td><td><code>Provider</code>, <code>Tool</code>, <code>Memory</code>, <code>Embedder</code>, <code>Guardrail</code> — plugin architecture</td><td>15.4, 3.1, 1.1</td></tr>
+          <tr><td><strong>Generics</strong></td><td><code>Agent&lt;P, M&gt;</code> — swap provider/memory without touching agent logic</td><td>15.6, 1.1</td></tr>
+          <tr><td><strong>Trait objects (<code>dyn</code>)</strong></td><td>Heterogeneous collections: <code>Vec&lt;Box&lt;dyn Tool&gt;&gt;</code></td><td>3.1, 15.4</td></tr>
+          <tr><td><strong>Enums</strong></td><td>Sum types: <code>Content</code>, <code>Role</code>, <code>StepKind</code>, <code>AgentEvent</code>, <code>FinishReason</code></td><td>Throughout</td></tr>
+          <tr><td><strong>Pattern matching</strong></td><td>Match on response types, error variants, tool call decisions</td><td>Throughout</td></tr>
+          <tr><td><strong><code>Arc&lt;Mutex&lt;T&gt;&gt;</code></strong></td><td>Shared mutable state across async tasks</td><td>14.1, 14.2</td></tr>
+          <tr><td><strong><code>async/await</code> + tokio</strong></td><td>All I/O is async: HTTP calls, DB queries, tool execution</td><td>Throughout</td></tr>
+          <tr><td><strong><code>async_trait</code></strong></td><td>Async methods in traits (bridge until RPITIT stable)</td><td>2.1, 3.1, 5.1</td></tr>
+          <tr><td><strong>Closures + <code>Fn</code> traits</strong></td><td>Pipeline conditions, mappers, guardrails as closures</td><td>7.1, 9.3</td></tr>
+          <tr><td><strong>Procedural macros</strong></td><td><code>#[tool]</code>, <code>#[agent]</code> — derive <code>Tool</code>/<code>Agent</code> boilerplate</td><td>15.1, 3.1</td></tr>
+          <tr><td><strong>Declarative macros</strong></td><td>Internal DSLs for pipeline definition</td><td>7.1</td></tr>
+          <tr><td><strong>Type-state pattern</strong></td><td>Builder that encodes state in type parameter: <code>AgentBuilder&lt;NoProvider&gt;</code> won't compile <code>.build()</code></td><td>15.1, 15.6</td></tr>
+          <tr><td><strong><code>Drop</code></strong></td><td>Automatic cleanup: cancel streams, release connections, flush buffers</td><td>1.4, 12.5</td></tr>
+          <tr><td><strong><code>std::any::Any</code></strong></td><td>Dynamic downcast for pipeline context when types vary per step</td><td>7.1, 7.2</td></tr>
+          <tr><td><strong>Associated types</strong></td><td><code>type Output</code> on traits when implementations differ</td><td>15.6</td></tr>
+          <tr><td><strong><code>impl Trait</code></strong></td><td>Return opaque types from functions without naming them</td><td>1.4</td></tr>
+          <tr><td><strong><code>Cow&lt;str&gt;</code></strong></td><td>Borrow or own strings — avoid allocation in prompt templates</td><td>4.1</td></tr>
+          <tr><td><strong><code>PhantomData</code></strong></td><td>Zero-cost type markers on generic structs</td><td>15.6</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 5 ==================== -->
+  <div class="section" id="s5">
+    <div class="section-header">
+      <span class="section-badge s5">&#9670; S5</span>
+      <span class="section-title">Project Structure</span>
+    </div>
+    <p class="section-desc">Workspace crate layout and file organization.</p>
+
+    <div class="content-card">
+<pre><code>rust_ai/
+├── Cargo.toml                    # workspace root
+├── crates/
+│   ├── ai-core/                  # Core traits, types, config
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── config.rs         # FrameworkConfig, layered config
+│   │   │   ├── types.rs          # Message, Role, Content, Usage, etc.
+│   │   │   ├── provider.rs       # Provider trait
+│   │   │   ├── tool.rs           # Tool trait + ToolDescriptor
+│   │   │   ├── memory.rs         # Memory trait
+│   │   │   ├── embedder.rs       # Embedder trait
+│   │   │   ├── guardrail.rs      # Guardrail trait
+│   │   │   ├── error.rs          # Unified error types
+│   │   │   └── template.rs       # Prompt template engine (tera)
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-provider-openai/       # OpenAI provider impl
+│   │   ├── src/lib.rs            # OpenAiProvider (uses reqwest)
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-provider-anthropic/    # Anthropic provider impl
+│   │   ├── src/lib.rs            # AnthropicProvider (uses reqwest)
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-provider-ollama/       # Ollama/local provider impl
+│   │   ├── src/lib.rs
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-agent/                 # Agent system
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── agent.rs          # Agent struct + ReAct loop
+│   │   │   ├── builder.rs        # AgentBuilder (type-state)
+│   │   │   ├── delegate.rs       # Agent delegation
+│   │   │   └── planner.rs        # Agent planning
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-tools/                 # Built-in tools
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── file.rs           # FileRead, FileWrite
+│   │   │   ├── http.rs           # HttpFetch (uses reqwest)
+│   │   │   ├── search.rs         # WebSearch
+│   │   │   ├── shell.rs          # ShellExec
+│   │   │   └── code.rs           # Code execution
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-tools-macros/          # Procedural macros
+│   │   ├── src/
+│   │   │   └── lib.rs            # #[tool], #[agent] derive macros
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-memory/                # Memory implementations
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── in_memory.rs      # InMemoryMemory
+│   │   │   ├── sql.rs            # SqlMemory (sqlx)
+│   │   │   └── redis.rs          # RedisMemory
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-rag/                   # RAG pipeline
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── chunker.rs        # Chunking strategies
+│   │   │   ├── ingestion.rs      # Document ingestion
+│   │   │   ├── retrieval.rs      # Retrieval strategies
+│   │   │   └── vector_store.rs   # VectorStore trait + backends
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-pipeline/              # Workflow orchestration
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── pipeline.rs       # Pipeline struct + executor
+│   │   │   ├── step.rs           # Step types: Task, Parallel, Conditional, Loop
+│   │   │   ├── context.rs        # PipelineContext
+│   │   │   └── dag.rs            # DAG resolution for task dependencies
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-observability/         # Logging, tracing, metrics
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── logging.rs        # Structured logging setup
+│   │   │   ├── tracing.rs        # Distributed tracing spans
+│   │   │   └── metrics.rs        # Prometheus metrics
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-cache/                 # Caching layer
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── response.rs       # Response cache (moka)
+│   │   │   └── semantic.rs       # Semantic cache (vector similarity)
+│   │   └── Cargo.toml
+│   │
+│   ├── ai-server/                # REST API server
+│   │   ├── src/
+│   │   │   ├── lib.rs
+│   │   │   ├── app.rs            # Axum router setup
+│   │   │   ├── routes/
+│   │   │   │   ├── agents.rs     # POST /agents/{id}/run
+│   │   │   │   ├── pipelines.rs  # POST /pipelines/{id}/execute
+│   │   │   │   └── health.rs     # GET /health
+│   │   │   └── middleware/
+│   │   │       ├── auth.rs       # API key auth
+│   │   │       └── rate_limit.rs # Rate limiting
+│   │   └── Cargo.toml
+│   │
+│   └── ai-cli/                   # CLI tool
+│       ├── src/
+│       │   └── main.rs           # clap-based CLI
+│       └── Cargo.toml
+│
+├── examples/                     # Example programs
+│   ├── basic_agent.rs
+│   ├── multi_agent.rs
+│   ├── rag_pipeline.rs
+│   └── streaming.rs
+│
+└── tests/                        # Integration tests
+    ├── provider_tests.rs
+    ├── agent_tests.rs
+    └── pipeline_tests.rs</code></pre>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 6 ==================== -->
+  <div class="section" id="s6">
+    <div class="section-header">
+      <span class="section-badge s6">&#9670; S6</span>
+      <span class="section-title">Workspace Cargo.toml</span>
+    </div>
+    <p class="section-desc">Shared dependency versions and workspace configuration.</p>
+
+    <div class="content-card">
+<pre><code>[workspace]
+members = [
+    "crates/ai-core",
+    "crates/ai-provider-openai",
+    "crates/ai-provider-anthropic",
+    "crates/ai-provider-ollama",
+    "crates/ai-agent",
+    "crates/ai-tools",
+    "crates/ai-tools-macros",
+    "crates/ai-memory",
+    "crates/ai-rag",
+    "crates/ai-pipeline",
+    "crates/ai-observability",
+    "crates/ai-cache",
+    "crates/ai-server",
+    "crates/ai-cli",
+]
+resolver = "2"
+
+[workspace.dependencies]
+# Async
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+tokio-stream = "0.1"
+
+# HTTP
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"] }
+axum = { version = "0.8", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging/Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+tracing-opentelemetry = "0.28"
+opentelemetry = "0.27"
+
+# Configuration
+config = "0.14"
+dotenvy = "0.15"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Templates
+tera = "1"
+
+# Schema
+schemars = "0.8"
+jsonschema = "0.26"
+
+# Caching
+moka = { version = "0.12", features = ["future"] }
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "sqlite", "json"] }
+
+# Vector
+qdrant-client = "1.12"
+
+# Local inference
+ort = { version = "2", features = ["load-dynamic"] }
+ndarray = "0.16"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Utils
+uuid = { version = "1", features = ["v4", "serde"] }
+dashmap = "6"</code></pre>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 7 ==================== -->
+  <div class="section" id="s7">
+    <div class="section-header">
+      <span class="section-badge s7">&#9670; S7</span>
+      <span class="section-title">Build Phases — Crate Dependency Order</span>
+    </div>
+    <p class="section-desc">Crate dependencies form a DAG. Build from the bottom up.</p>
+
+    <div class="content-card">
+<pre><code>Phase 1 — Build Order:
+
+  ai-core              (no internal deps — pure traits + types)
+       ↓
+  ai-provider-openai   (depends on ai-core + reqwest)
+  ai-provider-anthropic (depends on ai-core + reqwest)
+  ai-provider-ollama   (depends on ai-core + reqwest)
+       ↓
+  ai-tools             (depends on ai-core + reqwest)
+  ai-tools-macros      (depends on ai-core, proc-macro crate)
+       ↓
+  ai-agent             (depends on ai-core)
+       ↓
+  ai-pipeline          (depends on ai-core, ai-agent)
+
+Phase 2 — Build Order:
+
+  ai-memory            (depends on ai-core)
+  ai-cache             (depends on ai-core)
+  ai-observability     (depends on ai-core, tracing)
+       ↓
+  ai-rag               (depends on ai-core, ai-memory)
+       ↓
+  ai-server            (depends on ai-core, ai-agent, ai-pipeline, axum)
+
+Phase 3:
+
+  ai-cli               (depends on everything)</code></pre>
+    </div>
+  </div>
+
+  <!-- ==================== SECTION 8 ==================== -->
+  <div class="section" id="s8">
+    <div class="section-header">
+      <span class="section-badge s8">&#9670; S8</span>
+      <span class="section-title">Key Design Decisions</span>
+    </div>
+    <p class="section-desc">Rationale behind the major architectural choices.</p>
+
+    <!-- 8.1 -->
+    <div class="content-card">
+      <h3>8.1 Why Reqwest</h3>
+      <ul>
+        <li><strong>Connection pooling</strong>: Built-in via hyper. One <code>Client</code> per provider, reused across all requests. No manual pool management.</li>
+        <li><strong>Streaming</strong>: <code>bytes_stream()</code> returns a <code>Stream&lt;Item = Result&lt;Bytes&gt;&gt;</code> — maps directly to <code>BoxStream</code> for SSE parsing.</li>
+        <li><strong>TLS</strong>: <code>rustls-tls</code> feature avoids OpenSSL dependency. Pure Rust TLS stack.</li>
+        <li><strong>JSON</strong>: <code>json()</code> method serializes any <code>Serialize</code> type directly into the request body.</li>
+        <li><strong>Middleware</strong>: <code>reqwest-middleware</code> crate extends reqwest with retry, logging, tracing — matches REQ-7.4 and REQ-11.1.</li>
+      </ul>
+    </div>
+
+    <!-- 8.2 -->
+    <div class="content-card">
+      <h3>8.2 Why Traits Over Enums for Extensibility</h3>
+      <p>Users add their own providers, tools, and memory backends by implementing traits — no need to modify framework code or match on enum variants. The framework ships with built-in implementations; users add theirs via the plugin system.</p>
+    </div>
+
+    <!-- 8.3 -->
+    <div class="content-card">
+      <h3>8.3 Why Workspace Over Single Crate</h3>
+      <ul>
+        <li><strong>Compile time</strong>: Only rebuild what changed. Provider crates rarely change together.</li>
+        <li><strong>Dependency isolation</strong>: <code>ai-rag</code> pulls in heavy deps (qdrant, ort) that <code>ai-agent</code> doesn't need.</li>
+        <li><strong>Optional features</strong>: Users depend on only the crates they need.</li>
+        <li><strong>Publishing</strong>: Each crate can be versioned and published independently.</li>
+      </ul>
+    </div>
+
+    <!-- 8.4 -->
+    <div class="content-card">
+      <h3>8.4 Why async-trait (for now)</h3>
+      <p>Native async fn in traits (RPITIT) landed in Rust 1.75, but with limitations:</p>
+      <ul>
+        <li>No <code>Send</code> bounds on returned futures (needed for <code>tokio::spawn</code>)</li>
+        <li>No <code>dyn</code> dispatch (needed for <code>Box&lt;dyn Provider&gt;</code>)</li>
+      </ul>
+      <p>Once these stabilize, <code>async_trait</code> can be removed with a find-and-replace. The trait signatures stay the same.</p>
+    </div>
+
+    <!-- 8.5 -->
+    <div class="content-card">
+      <h3>8.5 Error Handling Strategy</h3>
+<pre><code>// Library errors — typed, exhaustive, thiserror
+#[derive(Debug, thiserror::Error)]
+pub enum ProviderError {
+    #[error("HTTP request failed: {0}")]
+    Http(#[from] reqwest::Error),
+
+    #[error("API error {status}: {body}")]
+    Api { status: reqwest::StatusCode, body: String },
+
+    #[error("Failed to deserialize response: {0}")]
+    Deserialize(#[from] serde_json::Error),
+
+    #[error("Request cancelled")]
+    Cancelled,
+}
+
+// Application errors — flexible, anyhow
+// Used in CLI, examples, and application code that doesn't need typed matching</code></pre>
+    </div>
+
+    <!-- 8.6 -->
+    <div class="content-card">
+      <h3>8.6 Type-State Builder for Agent</h3>
+      <p>Prevents runtime errors at compile time:</p>
+<pre><code>// These marker types cost zero bytes at runtime
+pub struct NoProvider;
+pub struct HasProvider(P); // where P: Provider
+
+pub struct AgentBuilder&lt;P, M, State&gt; { /* ... */ }
+
+// build() only exists when State = HasProvider
+impl&lt;P, M&gt; AgentBuilder&lt;P, M, HasProvider&gt;
+where
+    P: Provider,
+    M: Memory,
+{
+    pub fn build(self) -&gt; Result&lt;Agent&lt;P, M&gt;, AgentError&gt; { /* ... */ }
+}
+
+// provider() transitions from NoProvider → HasProvider
+impl&lt;M&gt; AgentBuilder&lt;NoProvider, M, NoProvider&gt; {
+    pub fn provider&lt;P: Provider&gt;(self, provider: P) -&gt; AgentBuilder&lt;P, M, HasProvider&gt; {
+        AgentBuilder { provider, ..self }
+    }
+}</code></pre>
+      <p>Calling <code>.build()</code> without setting a provider is a compile error — not a runtime panic.</p>
+    </div>
+  </div>
+
+  <footer>
+    <p>AI Framework Technical Design &mdash; Generated 2026-05-13</p>
+  </footer>
+</div>
+
+<script>
+// --- Theme ---
+function toggleTheme() {
+  const body = document.body;
+  if (body.getAttribute('data-theme') === 'light') {
+    body.removeAttribute('data-theme');
+    localStorage.setItem('theme', 'dark');
+  } else {
+    body.setAttribute('data-theme', 'light');
+    localStorage.setItem('theme', 'light');
+  }
+}
+if (localStorage.getItem('theme') === 'light') {
+  document.body.setAttribute('data-theme', 'light');
+}
+
+// --- Rust syntax highlighting ---
+(function() {
+  const KEYWORDS = /\b(pub|fn|async|struct|enum|impl|trait|use|let|mut|return|for|if|else|match|where|type|mod|self|Self|super|crate|as|in|ref|move|dyn|static|const|unsafe|extern)\b/g;
+  const TYPES = /\b(String|Vec|Option|Result|HashMap|Box|Arc|RwLock|Mutex|Send|Sync|Clone|Debug|Serialize|Deserialize|u32|u16|u8|i32|i64|f32|f64|bool|usize|str|Self|Provider|Tool|Memory|Agent|Pipeline|Step|StepKind|ModelConfig|Message|Role|Content|ContentPart|Usage|CompletionResponse|StreamChunk|ToolDescriptor|ToolOutput|ToolError|MemoryEntry|MemoryError|ProviderError|AgentError|PipelineError|PipelineContext|AgentOutput|AgentEvent|ToolCall|ToolCallDelta|FinishReason|Embedder|Guardrail|Value|Runnable|RetryPolicy|ProviderPool|OpenAiProvider|InMemoryMemory|CancellationToken|AgentBuilder|AgentInner|NoProvider|HasProvider|DateTime|Utc|Duration|RequestBuilder|Response|StatusCode|BoxStream)\b/g;
+  const MACROS = /(#\[derive\([^)]*\)\]|#\[async_trait\]|#\[tool\([^)]*\)\]|#\[error\([^)]*\)\]|#\[cfg\([^)]*\)\]|#\[allow\([^)]*\)\]|try_stream!|todo!|matches!)/g;
+  const LIFETIMES = /'(\w+)/g;
+  const COMMENTS = /(\/\/.*$)/gm;
+  const STRINGS = /("(?:[^"\\]|\\.)*")/g;
+
+  function highlightCode(el) {
+    let code = el.innerHTML;
+
+    // Protect strings and comments first by replacing with placeholders
+    var saved = [];
+    function save(match) {
+      saved.push(match);
+      return '\x00S' + (saved.length - 1) + 'S\x00';
+    }
+
+    // Save HTML entities that look like code
+    code = code.replace(/&lt;/g, '\x00LT\x00');
+    code = code.replace(/&gt;/g, '\x00GT\x00');
+    code = code.replace(/&amp;/g, '\x00AMP\x00');
+
+    // Save strings
+    code = code.replace(/"(?:[^"\\]|\\.)*"/g, save);
+
+    // Save comments
+    code = code.replace(/\/\/.*$/gm, save);
+
+    // Apply highlighting
+    code = code.replace(KEYWORDS, '<span class="kw">$1</span>');
+    code = code.replace(TYPES, '<span class="ty">$1</span>');
+    code = code.replace(MACROS, '<span class="macro">$1</span>');
+
+    // Restore saved items
+    for (var i = saved.length - 1; i >= 0; i--) {
+      code = code.replace('\x00S' + i + 'S\x00', saved[i]);
+    }
+
+    // Restore HTML entities
+    code = code.replace(/\x00LT\x00/g, '&lt;');
+    code = code.replace(/\x00GT\x00/g, '&gt;');
+    code = code.replace(/\x00AMP\x00/g, '&amp;');
+
+    el.innerHTML = code;
+  }
+
+  // Apply to all pre > code blocks
+  document.querySelectorAll('pre code').forEach(highlightCode);
+})();
+</script>
+</body>
+</html>

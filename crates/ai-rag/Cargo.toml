@@ -1,0 +1,16 @@
+[package]
+name = "ai-rag"
+version = "0.1.0"
+edition = "2021"
+description = "RAG pipeline: chunking, ingestion, retrieval, vector store"
+
+[dependencies]
+ai-core = { path = "../ai-core" }
+ai-memory = { path = "../ai-memory" }
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

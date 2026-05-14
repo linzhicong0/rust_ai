@@ -1,0 +1,15 @@
+[package]
+name = "ai-tools"
+version = "0.1.0"
+edition = "2021"
+description = "Built-in tools: file I/O, HTTP fetch, web search, shell, code execution"
+
+[dependencies]
+ai-core = { path = "../ai-core" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
