@@ -6,7 +6,6 @@ description = "Workflow orchestration: sequential, parallel, conditional, DAG pi
 
 [dependencies]
 ai-core = { path = "../ai-core" }
-ai-agent = { path = "../ai-agent" }
 tokio = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }

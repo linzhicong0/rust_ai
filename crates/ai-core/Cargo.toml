@@ -8,6 +8,7 @@ description = "Core traits, types, and configuration for the AI framework"
 tokio = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -16,5 +17,6 @@ config = { workspace = true }
 dotenvy = { workspace = true }
 tera = { workspace = true }
 schemars = { workspace = true }
+jsonschema = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }

@@ -621,7 +621,7 @@
     </div>
     <p class="phase-desc">Get a working framework that can call an LLM, define agents, run tools, and produce structured output.</p>
 
-    <div class="req-card" data-diff="easy">
+    <div class="req-card" data-diff="easy" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-15.3</span>
         <span class="req-name">Configuration</span>
@@ -634,7 +634,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="easy">
+    <div class="req-card" data-diff="easy" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-11.1</span>
         <span class="req-name">Logging</span>
@@ -648,7 +648,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="easy">
+    <div class="req-card" data-diff="easy" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-1.2</span>
         <span class="req-name">Model Configuration</span>
@@ -661,7 +661,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="easy">
+    <div class="req-card" data-diff="easy" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-15.1</span>
         <span class="req-name">SDK/API Design</span>
@@ -675,7 +675,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="easy">
+    <div class="req-card" data-diff="easy" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-4.1</span>
         <span class="req-name">Template System</span>
@@ -689,7 +689,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="easy">
+    <div class="req-card" data-diff="easy" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-3.1</span>
         <span class="req-name">Tool Definition</span>
@@ -703,7 +703,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="medium">
+    <div class="req-card" data-diff="medium" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-9.1</span>
         <span class="req-name">Structured Output</span>
@@ -717,7 +717,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="medium">
+    <div class="req-card" data-diff="medium" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-1.1</span>
         <span class="req-name">Multi-Provider Support</span>
@@ -731,7 +731,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="medium">
+    <div class="req-card" data-diff="medium" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-1.4</span>
         <span class="req-name">Streaming Support</span>
@@ -745,7 +745,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="medium">
+    <div class="req-card" data-diff="medium" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-5.1</span>
         <span class="req-name">Conversation Memory</span>
@@ -759,7 +759,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="medium">
+    <div class="req-card" data-diff="medium" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-2.1</span>
         <span class="req-name">Agent Definition</span>
@@ -773,7 +773,7 @@
       </ul>
     </div>
 
-    <div class="req-card" data-diff="medium">
+    <div class="req-card" data-diff="medium" data-done="true">
       <div class="req-head">
         <span class="req-id">REQ-7.1</span>
         <span class="req-name">Pipeline Definition</span>
@@ -1390,7 +1390,10 @@ function initBadges() {
     });
     card.querySelector('.req-head').appendChild(badge);
 
-    if (map[reqId]) applyDoneState(reqId);
+    if (map[reqId] || card.dataset.done === 'true') {
+      if (!map[reqId]) { map[reqId] = true; saveDoneMap(map); }
+      applyDoneState(reqId);
+    }
   });
   updateStats();
 }
