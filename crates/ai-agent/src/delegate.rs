@@ -14,7 +14,7 @@ use serde_json::Value;
 ///
 /// When an agent calls this tool, the specified agent is invoked with
 /// the given input, and the result is returned as the tool output.
-pub struct DelegateTool<P> {
+pub struct DelegateTool<P: ai_core::Provider + 'static> {
     agent: crate::Agent<P, ai_memory::InMemoryMemory>,
     name: String,
     description: String,
@@ -22,7 +22,7 @@ pub struct DelegateTool<P> {
 
 impl<P> DelegateTool<P>
 where
-    P: ai_core::Provider + Clone + Send + Sync,
+    P: ai_core::Provider + Clone + Send + Sync + 'static,
 {
     /// Create a new delegation tool.
     ///
@@ -47,7 +47,7 @@ where
 #[async_trait::async_trait]
 impl<P> Tool for DelegateTool<P>
 where
-    P: ai_core::Provider + Clone + Send + Sync,
+    P: ai_core::Provider + Clone + Send + Sync + 'static,
 {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
@@ -63,6 +63,7 @@ where
                 },
                 "required": ["task"]
             }),
+            output_schema: None,
         }
     }
 

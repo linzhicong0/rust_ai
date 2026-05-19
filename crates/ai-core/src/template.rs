@@ -18,9 +18,8 @@
 //! ## Example
 //!
 //! ```rust
-//! use ai_core::template::TemplateEngine;
-//! use serde_json::json;
-//!
+//! # use ai_core::template::TemplateEngine;
+//! # use serde_json::json;
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let mut engine = TemplateEngine::new()?;
 //!
@@ -35,9 +34,10 @@
 //! assert_eq!(rendered, "Hello world!");
 //!
 //! // Load from file
-//! engine.load_from_file("prompt", "templates/prompt.tera")?;
+//! # // engine.load_from_file("prompt", "templates/prompt.tera")?;
 //!
 //! // Use built-in agent templates
+//! # context.insert("role".to_string(), json!("Agent"));
 //! let rendered = engine.render_builtin("agent_default", &context)?;
 //! # Ok(())
 //! # }
@@ -375,6 +375,8 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    // REQ-4.1: Template System Tests
+
     #[test]
     fn test_template_rendering() {
         let mut engine = TemplateEngine::new().unwrap();
@@ -402,6 +404,34 @@ mod tests {
     }
 
     #[test]
+    fn test_conditional_false() {
+        let mut engine = TemplateEngine::new().unwrap();
+        engine
+            .add_template("cond", "{% if show_greeting %}Hello!{% endif %}World")
+            .unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("show_greeting".to_string(), json!(false));
+
+        let rendered = engine.render("cond", &context).unwrap();
+        assert_eq!(rendered, "World");
+    }
+
+    #[test]
+    fn test_conditional_if_else() {
+        let mut engine = TemplateEngine::new().unwrap();
+        engine
+            .add_template("cond", "{% if is_admin %}Admin{% else %}User{% endif %}")
+            .unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("is_admin".to_string(), json!(false));
+
+        let rendered = engine.render("cond", &context).unwrap();
+        assert_eq!(rendered, "User");
+    }
+
+    #[test]
     fn test_loop() {
         let mut engine = TemplateEngine::new().unwrap();
         engine
@@ -418,6 +448,35 @@ mod tests {
     }
 
     #[test]
+    fn test_loop_empty() {
+        let mut engine = TemplateEngine::new().unwrap();
+        engine
+            .add_template("loop", "{% for item in items %}{{ item }}{% else %}empty{% endfor %}")
+            .unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("items".to_string(), json!([]));
+
+        let rendered = engine.render("loop", &context).unwrap();
+        assert_eq!(rendered, "empty");
+    }
+
+    #[test]
+    fn test_loop_with_index() {
+        let mut engine = TemplateEngine::new().unwrap();
+        engine
+            .add_template("loop", "{% for item in items %}{{ loop.index }}: {{ item }} {% endfor %}")
+            .unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("items".to_string(), json!(["x", "y"]));
+
+        let rendered = engine.render("loop", &context).unwrap();
+        assert!(rendered.contains("1: x"));
+        assert!(rendered.contains("2: y"));
+    }
+
+    #[test]
     fn test_validate() {
         let engine = TemplateEngine::new().unwrap();
 
@@ -429,18 +488,27 @@ mod tests {
     }
 
     #[test]
-    fn test_builtin_template() {
-        let mut engine = TemplateEngine::new().unwrap();
+    fn test_validate_complex() {
+        let engine = TemplateEngine::new().unwrap();
 
-        let mut context = HashMap::new();
-        context.insert("role".to_string(), json!("Test Agent"));
-        context.insert("backstory".to_string(), json!("A test agent."));
-        context.insert("goal".to_string(), json!("To test templates."));
+        // Valid complex template
+        let valid = r#"
+            {% if show %}
+                Hello {{ name }}!
+                {% for item in items %}
+                    {{ item }}
+                {% endfor %}
+            {% endif %}
+        "#;
+        assert!(engine.validate(valid).is_ok());
 
-        let rendered = engine.render_builtin("agent_default", &context).unwrap();
-        assert!(rendered.contains("Test Agent"));
-        assert!(rendered.contains("A test agent."));
-        assert!(rendered.contains("To test templates."));
+        // Invalid: unclosed if
+        let invalid = r#"
+            {% if show %}
+                Hello
+            {# missing endif #}
+        "#;
+        assert!(engine.validate(invalid).is_err());
     }
 
     #[test]
@@ -461,5 +529,240 @@ mod tests {
         let names = engine.template_names();
         assert!(names.contains(&"test1".to_string()));
         assert!(names.contains(&"test2".to_string()));
+    }
+
+    #[test]
+    fn test_template_names_empty() {
+        let engine = TemplateEngine::new().unwrap();
+        assert_eq!(engine.template_names(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_builtin_template_agent_default() {
+        let mut engine = TemplateEngine::new().unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("role".to_string(), json!("Test Agent"));
+        context.insert("backstory".to_string(), json!("A test agent."));
+        context.insert("goal".to_string(), json!("To test templates."));
+
+        let rendered = engine.render_builtin("agent_default", &context).unwrap();
+        assert!(rendered.contains("Test Agent"));
+        assert!(rendered.contains("A test agent."));
+        assert!(rendered.contains("To test templates."));
+    }
+
+    #[test]
+    fn test_builtin_template_agent_default_without_optional() {
+        let mut engine = TemplateEngine::new().unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("role".to_string(), json!("Test Agent"));
+
+        let rendered = engine.render_builtin("agent_default", &context).unwrap();
+        assert!(rendered.contains("Test Agent"));
+        assert!(!rendered.contains("Backstory:"));
+        assert!(!rendered.contains("Your goal:"));
+    }
+
+    #[test]
+    fn test_builtin_template_agent_coder() {
+        let mut engine = TemplateEngine::new().unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("role".to_string(), json!("Senior Developer"));
+        context.insert("backstory".to_string(), json!("10 years of experience"));
+
+        let rendered = engine.render_builtin("agent_coder", &context).unwrap();
+        assert!(rendered.contains("Senior Developer"));
+        assert!(rendered.contains("10 years of experience"));
+        assert!(rendered.contains("clean, well-commented code"));
+    }
+
+    #[test]
+    fn test_builtin_template_agent_coder_defaults() {
+        let mut engine = TemplateEngine::new().unwrap();
+
+        let context = HashMap::new();
+        let rendered = engine.render_builtin("agent_coder", &context).unwrap();
+        // Uses default value from template
+        assert!(rendered.contains("Senior Software Engineer"));
+    }
+
+    #[test]
+    fn test_builtin_template_agent_researcher() {
+        let mut engine = TemplateEngine::new().unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("role".to_string(), json!("Research Analyst"));
+
+        let rendered = engine.render_builtin("agent_researcher", &context).unwrap();
+        assert!(rendered.contains("Research Analyst"));
+        assert!(rendered.contains("Find and cite accurate information"));
+    }
+
+    #[test]
+    fn test_builtin_template_agent_writer() {
+        let mut engine = TemplateEngine::new().unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("role".to_string(), json!("Content Writer"));
+
+        let rendered = engine.render_builtin("agent_writer", &context).unwrap();
+        assert!(rendered.contains("Content Writer"));
+        assert!(rendered.contains("Adapt tone and style"));
+    }
+
+    #[test]
+    fn test_builtin_template_unknown() {
+        let mut engine = TemplateEngine::new().unwrap();
+        let context = HashMap::new();
+
+        let result = engine.render_builtin("unknown_template", &context);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unknown built-in template"));
+    }
+
+    #[test]
+    fn test_add_templates_map() {
+        let mut engine = TemplateEngine::new().unwrap();
+
+        let mut templates = HashMap::new();
+        templates.insert("greeting".to_string(), "Hello {{ name }}!".to_string());
+        templates.insert("farewell".to_string(), "Goodbye {{ name }}!".to_string());
+
+        engine.add_templates_map(templates).unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("name".to_string(), json!("World"));
+
+        assert_eq!(engine.render("greeting", &context).unwrap(), "Hello World!");
+        assert_eq!(engine.render("farewell", &context).unwrap(), "Goodbye World!");
+    }
+
+    #[test]
+    fn test_add_templates_map_empty() {
+        let mut engine = TemplateEngine::new().unwrap();
+        let templates = HashMap::new();
+
+        let result = engine.add_templates_map(templates);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_add_templates_map_invalid_template() {
+        let mut engine = TemplateEngine::new().unwrap();
+
+        let mut templates = HashMap::new();
+        templates.insert("valid".to_string(), "Hello {{ name }}!".to_string());
+        templates.insert("invalid".to_string(), "Hello {{ name }!".to_string());
+
+        let result = engine.add_templates_map(templates);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_render_missing_variable() {
+        let mut engine = TemplateEngine::new().unwrap();
+        engine.add_template("test", "Hello {{ name }}!").unwrap();
+
+        let context = HashMap::new();
+
+        // Tera fails on missing variables
+        let result = engine.render("test", &context);
+        assert!(result.is_err());
+        // Error message should mention the variable name or template
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("name") || err_msg.contains("test"));
+    }
+
+    #[test]
+    fn test_render_nested_objects() {
+        let mut engine = TemplateEngine::new().unwrap();
+        engine.add_template("test", "User: {{ user.name }}").unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("user".to_string(), json!({"name": "Alice"}));
+
+        let rendered = engine.render("test", &context).unwrap();
+        assert_eq!(rendered, "User: Alice");
+    }
+
+    #[test]
+    fn test_render_filters() {
+        let mut engine = TemplateEngine::new().unwrap();
+        engine.add_template("test", "{{ name | upper }}").unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("name".to_string(), json!("hello"));
+
+        let rendered = engine.render("test", &context).unwrap();
+        assert_eq!(rendered, "HELLO");
+    }
+
+    #[test]
+    fn test_template_default_trait() {
+        let engine = TemplateEngine::default();
+        assert!(!engine.has_template("anything"));
+    }
+
+    #[test]
+    fn test_variable_interpolation_multiple() {
+        let mut engine = TemplateEngine::new().unwrap();
+        engine.add_template("test", "{{ greeting }}, {{ name }}!").unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("greeting".to_string(), json!("Hello"));
+        context.insert("name".to_string(), json!("World"));
+
+        let rendered = engine.render("test", &context).unwrap();
+        assert_eq!(rendered, "Hello, World!");
+    }
+
+    #[test]
+    fn test_whitespace_control() {
+        let mut engine = TemplateEngine::new().unwrap();
+        engine
+            .add_template("test", "A {% if show %} B {% endif %} C")
+            .unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("show".to_string(), json!(true));
+
+        let rendered = engine.render("test", &context).unwrap();
+        // Note: Tera preserves whitespace by default
+        assert!(rendered.contains("A"));
+        assert!(rendered.contains("B"));
+        assert!(rendered.contains("C"));
+    }
+
+    #[test]
+    fn test_template_render_twice() {
+        let mut engine = TemplateEngine::new().unwrap();
+        engine.add_template("test", "Value: {{ x }}").unwrap();
+
+        let mut context1 = HashMap::new();
+        context1.insert("x".to_string(), json!(1));
+        assert_eq!(engine.render("test", &context1).unwrap(), "Value: 1");
+
+        let mut context2 = HashMap::new();
+        context2.insert("x".to_string(), json!(2));
+        assert_eq!(engine.render("test", &context2).unwrap(), "Value: 2");
+    }
+
+    #[test]
+    fn test_render_builtin_caches_template() {
+        let mut engine = TemplateEngine::new().unwrap();
+
+        let mut context = HashMap::new();
+        context.insert("role".to_string(), json!("Test"));
+
+        // First call adds the template
+        engine.render_builtin("agent_default", &context).unwrap();
+        // Template should now exist
+        assert!(engine.has_template("agent_default"));
+
+        // Second call uses cached template
+        engine.render_builtin("agent_default", &context).unwrap();
     }
 }

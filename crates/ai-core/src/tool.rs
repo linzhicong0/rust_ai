@@ -7,18 +7,18 @@
 //! ## Example
 //!
 //! ```rust
-//! use ai_core::{Tool, ToolDescriptor, ToolOutput};
-//! use serde_json::json;
-//!
+//! # use ai_core::{Tool, ToolDescriptor, ToolOutput};
+//! # use ai_core::error::ToolError;
+//! # use serde_json::json;
 //! struct WeatherTool;
 //!
-//! #[async_trait::async_trait]
+//! # #[async_trait::async_trait]
 //! impl Tool for WeatherTool {
 //!     fn descriptor(&self) -> ToolDescriptor {
-//!         ToolDescriptor {
-//!             name: "get_weather".to_string(),
-//!             description: "Get current weather for a location".to_string(),
-//!             input_schema: json!({
+//!         ToolDescriptor::new(
+//!             "get_weather",
+//!             "Get current weather for a location",
+//!             json!({
 //!                 "type": "object",
 //!                 "properties": {
 //!                     "location": {
@@ -28,7 +28,7 @@
 //!                 },
 //!                 "required": ["location"]
 //!             }),
-//!         }
+//!         )
 //!     }
 //!
 //!     async fn execute(&self, input: serde_json::Value) -> Result<ToolOutput, ToolError> {
@@ -37,10 +37,7 @@
 //!             .ok_or_else(|| ToolError::InvalidInput("location required".to_string()))?;
 //!
 //!         // Call weather API...
-//!         Ok(ToolOutput {
-//!             content: format!("Weather in {location}: 72°F, sunny"),
-//!             is_error: false,
-//!         })
+//!         Ok(ToolOutput::success(format!("Weather in {location}: 72°F, sunny")))
 //!     }
 //! }
 //! ```
@@ -223,17 +220,20 @@ pub fn simple_descriptor(
 /// # Example
 ///
 /// ```rust
-/// use ai_core::tool::FnTool;
-/// use serde_json::json;
-///
+/// # use ai_core::tool::FnTool;
+/// # use ai_core::ToolOutput;
+/// # use ai_core::error::ToolError;
+/// # use serde_json::json;
+/// # use futures::FutureExt;
 /// let tool = FnTool::new(
 ///     "echo",
 ///     "Echoes the input",
 ///     json!({"type": "object"}),
 ///     |input| async move {
 ///         Ok(ToolOutput::success(format!("Echo: {}", input)))
-///     },
+///     }.boxed(),
 /// );
+/// # let _ = tool;
 /// ```
 pub struct FnTool<F> {
     descriptor: ToolDescriptor,
@@ -347,6 +347,10 @@ impl ToolRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::FutureExt;
+    use serde_json::json;
+
+    // REQ-3.1: Tool Definition Tests
 
     struct TestTool;
 
@@ -362,6 +366,23 @@ mod tests {
 
         async fn execute(&self, input: Value) -> Result<ToolOutput, ToolError> {
             Ok(ToolOutput::success(format!("Received: {}", input)))
+        }
+    }
+
+    struct AnotherTestTool;
+
+    #[async_trait::async_trait]
+    impl Tool for AnotherTestTool {
+        fn descriptor(&self) -> ToolDescriptor {
+            ToolDescriptor::new(
+                "another_test",
+                "Another test tool",
+                json!({"type": "object"}),
+            )
+        }
+
+        async fn execute(&self, _input: Value) -> Result<ToolOutput, ToolError> {
+            Ok(ToolOutput::success("OK"))
         }
     }
 
@@ -394,5 +415,278 @@ mod tests {
         let error = ToolOutput::error("failed");
         assert!(error.is_error);
         assert_eq!(error.content, "failed");
+    }
+
+    #[test]
+    fn test_tool_descriptor_new() {
+        let descriptor = ToolDescriptor::new(
+            "my_tool",
+            "A description",
+            json!({"type": "object"}),
+        );
+
+        assert_eq!(descriptor.name, "my_tool");
+        assert_eq!(descriptor.description, "A description");
+        assert_eq!(descriptor.input_schema, json!({"type": "object"}));
+        assert!(descriptor.output_schema.is_none());
+    }
+
+    #[test]
+    fn test_tool_descriptor_with_output_schema() {
+        let descriptor = ToolDescriptor::new(
+            "my_tool",
+            "A description",
+            json!({"type": "object"}),
+        )
+        .with_output_schema(json!({"type": "string"}));
+
+        assert_eq!(
+            descriptor.output_schema,
+            Some(json!({"type": "string"}))
+        );
+    }
+
+    #[test]
+    fn test_tool_output_json() {
+        #[derive(Serialize)]
+        struct TestStruct {
+            message: String,
+            count: i32,
+        }
+
+        let value = TestStruct {
+            message: "hello".to_string(),
+            count: 42,
+        };
+
+        let output = ToolOutput::json(&value).unwrap();
+        assert!(!output.is_error);
+        assert!(output.content.contains("hello"));
+        assert!(output.content.contains("42"));
+    }
+
+    #[test]
+    fn test_tool_output_json_serialization_success() {
+        // Test that serialization works correctly for valid types
+        #[derive(Serialize)]
+        struct TestStruct {
+            message: String,
+        }
+
+        let test = TestStruct {
+            message: "test".to_string(),
+        };
+        let result = ToolOutput::json(&test);
+        assert!(result.is_ok());
+        assert!(!result.unwrap().is_error);
+    }
+
+    #[tokio::test]
+    async fn test_tool_registry_multiple_tools() {
+        let mut registry = ToolRegistry::new();
+        registry.register(TestTool);
+        registry.register(AnotherTestTool);
+
+        assert!(registry.contains("test"));
+        assert!(registry.contains("another_test"));
+
+        let mut names = registry.list();
+        names.sort();
+        assert_eq!(names, vec!["another_test", "test"]);
+    }
+
+    #[test]
+    fn test_tool_registry_get() {
+        let mut registry = ToolRegistry::new();
+        registry.register(TestTool);
+
+        let tool = registry.get("test");
+        assert!(tool.is_some());
+        assert_eq!(tool.unwrap().descriptor().name, "test");
+
+        let nonexistent = registry.get("nonexistent");
+        assert!(nonexistent.is_none());
+    }
+
+    #[test]
+    fn test_tool_registry_descriptors() {
+        let mut registry = ToolRegistry::new();
+        registry.register(TestTool);
+        registry.register(AnotherTestTool);
+
+        let descriptors = registry.descriptors();
+        assert_eq!(descriptors.len(), 2);
+
+        let names: Vec<_> = descriptors.iter().map(|d| &d.name).collect();
+        assert!(names.contains(&&"test".to_string()));
+        assert!(names.contains(&&"another_test".to_string()));
+    }
+
+    #[test]
+    #[should_panic(expected = "Tool already registered")]
+    fn test_tool_registry_duplicate_panics() {
+        let mut registry = ToolRegistry::new();
+        registry.register(TestTool);
+        registry.register(TestTool); // Should panic
+    }
+
+    // Test FnTool
+    #[tokio::test]
+    async fn test_fn_tool() {
+        let tool = FnTool::new(
+            "echo",
+            "Echoes the input",
+            json!({"type": "object"}),
+            |input| async move {
+                Ok(ToolOutput::success(format!("Echo: {}", input)))
+            }.boxed(),
+        );
+
+        let descriptor = tool.descriptor();
+        assert_eq!(descriptor.name, "echo");
+        assert_eq!(descriptor.description, "Echoes the input");
+
+        let result = tool.execute(json!("test")).await.unwrap();
+        assert_eq!(result.content, "Echo: \"test\"");
+    }
+
+    #[tokio::test]
+    async fn test_fn_tool_with_error() {
+        let tool = FnTool::new(
+            "fail_tool",
+            "A tool that fails",
+            json!({"type": "object"}),
+            |_input| async move {
+                Ok(ToolOutput::error("Something went wrong"))
+            }.boxed(),
+        );
+
+        let result = tool.execute(json!({})).await.unwrap();
+        assert!(result.is_error);
+        assert_eq!(result.content, "Something went wrong");
+    }
+
+    #[tokio::test]
+    async fn test_fn_tool_with_output_schema() {
+        let tool = FnTool::new(
+            "json_tool",
+            "Returns JSON",
+            json!({"type": "object"}),
+            |_input| async move {
+                Ok(ToolOutput::success("{\"result\": 42}".to_string()))
+            }.boxed(),
+        )
+        .with_output_schema(json!({"type": "string"}));
+
+        let descriptor = tool.descriptor();
+        assert_eq!(
+            descriptor.output_schema,
+            Some(json!({"type": "string"}))
+        );
+    }
+
+    // Test SyncTool and SyncToolAdapter
+    struct SyncTestTool;
+
+    impl SyncTool for SyncTestTool {
+        fn descriptor(&self) -> ToolDescriptor {
+            ToolDescriptor::new(
+                "sync_test",
+                "A sync test tool",
+                json!({"type": "object"}),
+            )
+        }
+
+        fn execute_sync(&self, input: Value) -> Result<ToolOutput, ToolError> {
+            Ok(ToolOutput::success(format!("Sync: {}", input)))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_sync_tool_adapter() {
+        let adapter = SyncToolAdapter(SyncTestTool);
+
+        let descriptor = adapter.descriptor();
+        assert_eq!(descriptor.name, "sync_test");
+
+        let result = adapter.execute(json!("test")).await.unwrap();
+        assert_eq!(result.content, "Sync: \"test\"");
+    }
+
+    #[tokio::test]
+    async fn test_sync_tool_adapter_error() {
+        struct FailingSyncTool;
+
+        impl SyncTool for FailingSyncTool {
+            fn descriptor(&self) -> ToolDescriptor {
+                ToolDescriptor::new(
+                    "failing_sync",
+                    "A failing sync tool",
+                    json!({"type": "object"}),
+                )
+            }
+
+            fn execute_sync(&self, _input: Value) -> Result<ToolOutput, ToolError> {
+                Err(ToolError::Execution("Failed".to_string()))
+            }
+        }
+
+        let adapter = SyncToolAdapter(FailingSyncTool);
+        let result = adapter.execute(json!({})).await;
+
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ToolError::Execution(_)));
+    }
+
+    // Test simple_descriptor helper
+    #[test]
+    fn test_simple_descriptor() {
+        let descriptor = simple_descriptor(
+            "my_tool",
+            "Does something",
+            json!({"type": "object", "properties": {}}),
+        );
+
+        assert_eq!(descriptor.name, "my_tool");
+        assert_eq!(descriptor.description, "Does something");
+        assert_eq!(descriptor.input_schema, json!({"type": "object", "properties": {}}));
+    }
+
+    // Test ToolOutput edge cases
+    #[test]
+    fn test_tool_output_empty_content() {
+        let success = ToolOutput::success("");
+        assert!(!success.is_error);
+        assert_eq!(success.content, "");
+
+        let error = ToolOutput::error("");
+        assert!(error.is_error);
+        assert_eq!(error.content, "");
+    }
+
+    #[test]
+    fn test_tool_output_from_string() {
+        let success = ToolOutput::success(String::from("test"));
+        assert_eq!(success.content, "test");
+
+        let error = ToolOutput::error(String::from("failed"));
+        assert_eq!(error.content, "failed");
+    }
+
+    #[test]
+    fn test_tool_output_long_content() {
+        let long_content = "a".repeat(10000);
+        let output = ToolOutput::success(long_content.clone());
+        assert_eq!(output.content.len(), 10000);
+    }
+
+    // Test ToolRegistry edge cases
+    #[test]
+    fn test_tool_registry_empty() {
+        let registry = ToolRegistry::new();
+        assert!(!registry.contains("anything"));
+        assert!(registry.list().is_empty());
+        assert!(registry.descriptors().is_empty());
+        assert!(registry.get("anything").is_none());
     }
 }

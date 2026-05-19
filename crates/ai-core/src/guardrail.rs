@@ -6,26 +6,26 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use ai_core::{Guardrail, GuardrailAction};
-//!
+//! # use ai_core::{Guardrail, GuardrailError};
+//! # use ai_core::guardrail::GuardrailAction;
 //! struct PiiFilter;
 //!
-//! #[async_trait::async_trait]
-//! impl ai_core::Guardrail for PiiFilter {
-//!     async fn check_input(&self, input: &str) -> Result<GuardrailAction, ai_core::GuardrailError> {
+//! # #[async_trait::async_trait]
+//! impl Guardrail for PiiFilter {
+//! #     async fn check_input(&self, input: &str) -> Result<GuardrailAction, GuardrailError> {
 //!         if input.contains("SSN:") {
 //!             return Ok(GuardrailAction::Block("PII detected".to_string()));
 //!         }
 //!         Ok(GuardrailAction::Allow)
-//!     }
+//! #     }
 //!
-//!     async fn check_output(&self, output: &str) -> Result<GuardrailAction, ai_core::GuardrailError> {
+//! #     async fn check_output(&self, output: &str) -> Result<GuardrailAction, GuardrailError> {
 //!         Ok(GuardrailAction::Allow)
-//!     }
+//! #     }
 //!
-//!     fn name(&self) -> &str {
+//! #     fn name(&self) -> &str {
 //!         "pii_filter"
-//!     }
+//! #     }
 //! }
 //! ```
 

@@ -226,8 +226,9 @@ impl LlmRequestLogger {
             messages_count = messages_count
         );
 
-        let enter = _span.enter();
+        let _guard = _span.enter();
         debug!("Starting LLM request");
+        drop(_guard); // Explicitly drop the guard before moving _span
 
         Self {
             _span,

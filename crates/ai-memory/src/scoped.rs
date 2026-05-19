@@ -1,11 +1,9 @@
 //! Thread-scoped memory for managing multiple conversations.
 
-use async_trait::async_trait;
 use dashmap::DashMap;
 use std::sync::Arc;
 
-use ai_core::error::MemoryError;
-use ai_core::memory::{Memory, MemoryEntry};
+use ai_core::memory::MemoryEntry;
 
 /// Thread-scoped memory storage for multiple conversations.
 ///
@@ -17,24 +15,24 @@ use ai_core::memory::{Memory, MemoryEntry};
 ///
 /// ```rust,no_run
 /// use ai_memory::ThreadScopedMemory;
-/// use ai_core::{Memory, MemoryEntry};
+/// use ai_core::memory::{MemoryEntry, ScopedMemory};
 /// use ai_core::types::Role;
 ///
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let memory = ThreadScopedMemory::new();
+/// let memory = ThreadScopedMemory::new(100);
 ///
 /// // Session 1
 /// let session1 = "user-123-conversation-1";
-/// memory.add(session1, MemoryEntry::new(Role::User, "Hello from session 1")).await?;
+/// memory.add_to_scope(session1, MemoryEntry::new(Role::User, "Hello from session 1")).await?;
 ///
 /// // Session 2 (separate history)
 /// let session2 = "user-123-conversation-2";
-/// memory.add(session2, MemoryEntry::new(Role::User, "Hello from session 2")).await?;
+/// memory.add_to_scope(session2, MemoryEntry::new(Role::User, "Hello from session 2")).await?;
 ///
 /// // Each session has its own history
-/// let hist1 = memory.get(session1, None).await?;
-/// let hist2 = memory.get(session2, None).await?;
+/// let hist1 = memory.get_from_scope(session1, None).await?;
+/// let hist2 = memory.get_from_scope(session2, None).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -94,61 +92,6 @@ impl ThreadScopedMemory {
 impl Default for ThreadScopedMemory {
     fn default() -> Self {
         Self::new(1000)
-    }
-}
-
-#[async_trait]
-impl Memory for ThreadScopedMemory {
-    async fn add(&self, scope: &str, entry: MemoryEntry) -> Result<(), MemoryError> {
-        let memory = self.get_or_create_scope(scope);
-        let mut entries = memory.write().await;
-
-        if entries.len() >= self.max_entries {
-            entries.remove(0);
-        }
-        entries.push(entry);
-        Ok(())
-    }
-
-    async fn get(&self, scope: &str, limit: Option<usize>) -> Result<Vec<MemoryEntry>, MemoryError> {
-        if let Some(memory) = self.memories.get(scope) {
-            let entries = memory.read().await;
-            let result = match limit {
-                Some(n) => entries.iter().rev().take(n).cloned().collect(),
-                None => entries.clone(),
-            };
-            Ok(result)
-        } else {
-            Ok(Vec::new())
-        }
-    }
-
-    async fn search(&self, scope: &str, query: &str, limit: usize) -> Result<Vec<MemoryEntry>, MemoryError> {
-        if let Some(memory) = self.memories.get(scope) {
-            let entries = memory.read().await;
-            let query_lower = query.to_lowercase();
-            let results: Vec<MemoryEntry> = entries
-                .iter()
-                .filter(|e| {
-                    e.content.to_lowercase().contains(&query_lower)
-                        || e.metadata.values().any(|v| {
-                            v.to_string().to_lowercase().contains(&query_lower)
-                        })
-                })
-                .take(limit)
-                .cloned()
-                .collect();
-            Ok(results)
-        } else {
-            Ok(Vec::new())
-        }
-    }
-
-    async fn clear(&self, scope: &str) -> Result<(), MemoryError> {
-        if let Some(memory) = self.memories.get(scope) {
-            memory.write().await.clear();
-        }
-        Ok(())
     }
 }
 
@@ -234,6 +177,7 @@ impl ai_core::memory::ScopedMemory for ThreadScopedMemory {
 mod tests {
     use super::*;
     use ai_core::types::Role;
+    use ai_core::memory::ScopedMemory;
 
     #[tokio::test]
     async fn test_multiple_scopes() {

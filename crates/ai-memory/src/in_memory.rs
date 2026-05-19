@@ -131,7 +131,7 @@ mod tests {
 
         let entries = memory.get(None).await.unwrap();
         assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].role, Role::User);
+        assert!(matches!(entries[0].role, Role::User));
     }
 
     #[tokio::test]

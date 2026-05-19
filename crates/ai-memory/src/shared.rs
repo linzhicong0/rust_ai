@@ -32,8 +32,13 @@ use ai_core::memory::Memory;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone)]
 pub struct SharedMemory<M>(Arc<M>);
+
+impl<M> Clone for SharedMemory<M> {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
 
 impl<M> SharedMemory<M>
 where
@@ -96,6 +101,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ai_core::{Memory, MemoryEntry};
     use crate::InMemoryMemory;
     use ai_core::types::Role;
 

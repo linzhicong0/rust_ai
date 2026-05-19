@@ -7,24 +7,8 @@
 //!
 //! ## Quick Start
 //!
-//! ```rust,no_run
-//! use ai_core::{Provider, Agent, Tool, Memory};
-//! use ai_core::types::{Message, Role, Content};
-//!
-//! // Create a provider (e.g., OpenAI, Anthropic)
-//! let provider = MyProvider::new("api-key");
-//!
-//! // Define an agent with tools and memory
-//! let agent = Agent::builder()
-//!     .provider(provider)
-//!     .role("You are a helpful assistant.")
-//!     .tool(MyTool::new())
-//!     .build()?;
-//!
-//! // Run the agent
-//! let response = agent.run("Hello, world!").await?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
+//! The framework provides traits for providers, agents, tools, and memory.
+//! See the [`prelude`](prelude) module for a convenient set of imports.
 //!
 //! ## Key Concepts
 //!
@@ -120,16 +104,42 @@ pub type Result<T, E = error::AgentError> = std::result::Result<T, E>;
 mod tests {
     use super::*;
 
+    // REQ-15.1: SDK/API - Test that all public re-exports compile correctly
+
     #[test]
     fn test_re_exports_are_accessible() {
         // Verify that re-exports compile and are accessible
 
-        // Types
+        // Core types from types.rs
         let _role = Role::User;
         let _content = Content::Text("test".to_string());
+        let _content_part = ContentPart::Text("test".to_string());
+
+        let _config = ModelConfig::new("gpt-4");
+        let _message = Message::user("test");
+        let _finish_reason = FinishReason::Stop;
+
+        // Struct types
+        let _tool_call = ToolCall {
+            id: "test".to_string(),
+            name: "test_tool".to_string(),
+            arguments: serde_json::json!({}),
+        };
+
+        let _usage = Usage {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            total_tokens: 150,
+        };
 
         // Error types can be instantiated
-        let _err = ToolError::Execution("test".to_string());
+        let _tool_err = ToolError::Execution("test".to_string());
+        let _agent_err = AgentError::MaxIterationsExceeded;
+        let _provider_err = ProviderError::Cancelled;
+        let _memory_err = MemoryError::NotFound("test".to_string());
+        let _embedder_err = EmbedderError::Model("test".to_string());
+        let _guardrail_err = GuardrailError::Check("test".to_string());
+        let _pipeline_err = PipelineError::Context("test".to_string());
     }
 
     #[test]
@@ -141,5 +151,82 @@ mod tests {
             role: Role::User,
             content: Content::Text("hello".to_string()),
         };
+
+        let _config = ModelConfig::new("gpt-4");
+        let _event = AgentEvent::Text("test".to_string());
+        let _output = AgentOutput {
+            content: "test".to_string(),
+        };
+
+        // Verify usage is accessible
+        let _usage = Usage {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            total_tokens: 150,
+        };
+    }
+
+    #[test]
+    fn test_config_re_export() {
+        // Verify FrameworkConfig is accessible
+        let _config = FrameworkConfig::default();
+    }
+
+    #[test]
+    fn test_template_engine_re_export() {
+        // Verify TemplateEngine is accessible
+        let _engine = TemplateEngine::new().unwrap();
+    }
+
+    #[test]
+    fn test_structured_output_re_export() {
+        // Verify structured output types are accessible
+        let _config = StructuredOutputConfig::new(serde_json::json!({"type": "object"}));
+        let _err = StructuredOutputError::ValidationError("test".to_string());
+    }
+
+    #[test]
+    fn test_result_type_alias() {
+        // Verify the Result type alias works
+        fn returns_result() -> Result<()> {
+            Ok(())
+        }
+        let _ = returns_result();
+
+        fn returns_error() -> Result<String> {
+            Err(AgentError::MaxIterationsExceeded)
+        }
+        let _ = returns_error();
+    }
+
+    #[test]
+    fn test_all_prelude_types_exist() {
+        // This test ensures all types declared in prelude actually exist
+        use crate::prelude::*;
+
+        // These should all compile without errors
+        let msg = Message::user("test");
+        match msg.role {
+            Role::User => {} // Verify User variant exists
+            _ => {}
+        }
+
+        let _ = ModelConfig::gpt4();
+        let _ = Role::User;
+        let _ = Content::Text("test".to_string());
+        let _ = AgentEvent::Text("test".to_string());
+        let _ = AgentOutput { content: "test".to_string() };
+        let _ = Usage {
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+        };
+
+        // Traits are object-safe
+        let _tool: Option<Box<dyn Tool>> = None;
+        let _memory: Option<Box<dyn Memory>> = None;
+        let _embedder: Option<Box<dyn Embedder>> = None;
+
+        let _config = FrameworkConfig::default();
     }
 }

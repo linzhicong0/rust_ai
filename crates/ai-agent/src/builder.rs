@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 
+use ai_core::error::AgentError;
 use ai_core::memory::Memory;
 use ai_core::provider::Provider;
 use ai_core::tool::Tool;
@@ -16,7 +17,7 @@ use super::agent::{Agent, AgentInner};
 
 // Type-state markers
 pub struct NoProvider;
-pub struct HasProvider<P>(P);
+pub struct HasProvider<P>(std::marker::PhantomData<P>);
 
 /// Builder for constructing an [`Agent`].
 ///
@@ -46,8 +47,7 @@ pub struct HasProvider<P>(P);
 /// ```
 pub struct AgentBuilder<P, M, State = NoProvider>
 where
-    P: Provider,
-    M: Memory,
+    M: Memory + 'static,
 {
     pub(crate) provider: Option<P>,
     pub(crate) memory: M,
@@ -57,10 +57,10 @@ where
     pub(crate) tools: Vec<Box<dyn Tool>>,
     pub(crate) model_config: ModelConfig,
     pub(crate) max_iterations: u32,
-    pub(crate) _state: std::marker::PhantomData<State>,
+    pub(crate) _state: std::marker::PhantomData<(P, State)>,
 }
 
-impl<M> AgentBuilder<M::ProviderType, M, NoProvider>
+impl<M> AgentBuilder<(), M, NoProvider>
 where
     M: Memory + WithProvider,
 {
@@ -86,28 +86,8 @@ where
 
 impl<P, M, State> AgentBuilder<P, M, State>
 where
-    P: Provider,
-    M: Memory,
+    M: Memory + 'static,
 {
-    /// Set the LLM provider for this agent.
-    ///
-    /// # Arguments
-    ///
-    /// * `provider` — The provider implementation
-    pub fn provider(self, provider: P) -> AgentBuilder<P, M, HasProvider<P>> {
-        AgentBuilder {
-            provider: Some(provider),
-            memory: self.memory,
-            role: self.role,
-            goal: self.goal,
-            backstory: self.backstory,
-            tools: self.tools,
-            model_config: self.model_config,
-            max_iterations: self.max_iterations,
-            _state: std::marker::PhantomData,
-        }
-    }
-
     /// Set the agent's role description.
     ///
     /// This is included in the system prompt and tells the agent what
@@ -186,10 +166,37 @@ where
     }
 }
 
+impl<P, M> AgentBuilder<P, M, NoProvider>
+where
+    M: Memory + 'static,
+{
+    /// Set the LLM provider for this agent.
+    ///
+    /// # Arguments
+    ///
+    /// * `provider` — The provider implementation
+    pub fn provider<Pr: Provider + 'static>(
+        self,
+        provider: Pr,
+    ) -> AgentBuilder<Pr, M, HasProvider<Pr>> {
+        AgentBuilder {
+            provider: Some(provider),
+            memory: self.memory,
+            role: self.role,
+            goal: self.goal,
+            backstory: self.backstory,
+            tools: self.tools,
+            model_config: self.model_config,
+            max_iterations: self.max_iterations,
+            _state: std::marker::PhantomData,
+        }
+    }
+}
+
 impl<P, M> AgentBuilder<P, M, HasProvider<P>>
 where
-    P: Provider,
-    M: Memory,
+    P: Provider + 'static,
+    M: Memory + 'static,
 {
     /// Build the agent.
     ///
@@ -216,19 +223,11 @@ where
     }
 }
 
-// Helper trait for type-state pattern
-pub trait WithProvider: Memory {
-    type ProviderType: Provider;
-}
+// Helper trait for type-state pattern - allows any memory with any provider
+pub trait WithProvider: Memory + 'static {}
 
-// Implementation for concrete memory types
-impl<T, P> WithProvider for T
-where
-    T: Memory,
-    P: Provider,
-{
-    type ProviderType = P;
-}
+// Implement for all Memory types
+impl<T> WithProvider for T where T: Memory + 'static {}
 
 #[cfg(test)]
 mod tests {

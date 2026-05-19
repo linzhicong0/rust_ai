@@ -236,6 +236,183 @@ pub enum TaskValidationError {
     CircularDependency(String),
 }
 
+/// Builder for creating [`Task`] instances with a fluent API.
+///
+/// The TaskBuilder provides a convenient way to construct tasks with all
+/// optional configuration. Required fields (agent_name, input_key, output_key)
+/// must be provided before building.
+///
+/// # Example
+///
+/// ```rust
+/// use ai_pipeline::TaskBuilder;
+/// use ai_pipeline::RetryPolicy;
+/// use std::time::Duration;
+/// use serde_json::json;
+///
+/// let task = TaskBuilder::new("my_agent", "input", "output")
+///     .description("Process user data")
+///     .expected_output(json!({"status": "success"}))
+///     .dependency("previous_task")
+///     .timeout(Duration::from_secs(30))
+///     .retry_policy(RetryPolicy::fixed(3, 1000))
+///     .build()
+///     .unwrap();
+/// ```
+#[derive(Debug, Clone)]
+pub struct TaskBuilder {
+    /// The task being built.
+    inner: Task,
+}
+
+impl TaskBuilder {
+    /// Create a new TaskBuilder with required fields.
+    ///
+    /// # Arguments
+    ///
+    /// * `agent_name` — Name of the agent to run
+    /// * `input_key` — Key in the context to read input from
+    /// * `output_key` — Key in the context to write output to
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use ai_pipeline::TaskBuilder;
+    ///
+    /// let builder = TaskBuilder::new("agent", "in", "out");
+    /// ```
+    pub fn new(
+        agent_name: impl Into<String>,
+        input_key: impl Into<String>,
+        output_key: impl Into<String>,
+    ) -> Self {
+        Self {
+            inner: Task::new(agent_name, input_key, output_key),
+        }
+    }
+
+    /// Set the task description.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ai_pipeline::TaskBuilder;
+    /// let builder = TaskBuilder::new("agent", "in", "out")
+    ///     .description("Process the user request");
+    /// ```
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.inner.description = Some(description.into());
+        self
+    }
+
+    /// Set the expected output schema/value for validation.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ai_pipeline::TaskBuilder;
+    /// # use serde_json::json;
+    /// let builder = TaskBuilder::new("agent", "in", "out")
+    ///     .expected_output(json!({"result": "success"}));
+    /// ```
+    pub fn expected_output(mut self, expected: Value) -> Self {
+        self.inner.expected_output = Some(expected);
+        self
+    }
+
+    /// Add a dependency on another task.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ai_pipeline::TaskBuilder;
+    /// let builder = TaskBuilder::new("agent", "in", "out")
+    ///     .dependency("setup_task");
+    /// ```
+    pub fn dependency(mut self, dep: impl Into<String>) -> Self {
+        self.inner.dependencies.push(dep.into());
+        self
+    }
+
+    /// Set multiple dependencies at once.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ai_pipeline::TaskBuilder;
+    /// let builder = TaskBuilder::new("agent", "in", "out")
+    ///     .dependencies(vec!["task1".to_string(), "task2".to_string()]);
+    /// ```
+    pub fn dependencies(mut self, deps: Vec<String>) -> Self {
+        self.inner.dependencies = deps;
+        self
+    }
+
+    /// Set the timeout for this task.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ai_pipeline::TaskBuilder;
+    /// # use std::time::Duration;
+    /// let builder = TaskBuilder::new("agent", "in", "out")
+    ///     .timeout(Duration::from_secs(30));
+    /// ```
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.inner.timeout = Some(timeout);
+        self
+    }
+
+    /// Set the retry policy for this task.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ai_pipeline::TaskBuilder;
+    /// # use ai_pipeline::RetryPolicy;
+    /// let builder = TaskBuilder::new("agent", "in", "out")
+    ///     .retry_policy(RetryPolicy::fixed(3, 1000));
+    /// ```
+    pub fn retry_policy(mut self, policy: RetryPolicy) -> Self {
+        self.inner.retry_policy = Some(policy);
+        self
+    }
+
+    /// Build the task, validating the configuration.
+    ///
+    /// Returns an error if the task configuration is invalid.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ai_pipeline::TaskBuilder;
+    /// let task = TaskBuilder::new("agent", "in", "out")
+    ///     .description("My task")
+    ///     .build()
+    /// .unwrap();
+    /// ```
+    pub fn build(self) -> Result<Task, TaskValidationError> {
+        self.inner.validate()?;
+        Ok(self.inner)
+    }
+
+    /// Build the task without validation.
+    ///
+    /// This skips validation and returns the task as-is.
+    /// Only use this if you're sure the configuration is valid.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use ai_pipeline::TaskBuilder;
+    /// let task = TaskBuilder::new("agent", "in", "out")
+    ///     .build_unchecked();
+    /// ```
+    pub fn build_unchecked(self) -> Task {
+        self.inner
+    }
+}
+
 /// A single step in a pipeline.
 ///
 /// Steps define what work should be done during pipeline execution.
@@ -664,5 +841,130 @@ mod tests {
             StepKind::Loop { max_iterations, .. } => assert_eq!(*max_iterations, 100),
             _ => panic!("Expected Loop step"),
         }
+    }
+
+    // Tests for Task
+    #[test]
+    fn test_task_new() {
+        let task = Task::new("agent", "input", "output");
+        assert_eq!(task.agent_name, "agent");
+        assert_eq!(task.input_key, "input");
+        assert_eq!(task.output_key, "output");
+        assert!(task.description.is_none());
+        assert!(task.expected_output.is_none());
+        assert!(task.dependencies.is_empty());
+        assert!(task.timeout.is_none());
+        assert!(task.retry_policy.is_none());
+    }
+
+    #[test]
+    fn test_task_builder() {
+        let task = TaskBuilder::new("agent", "in", "out")
+            .description("Test task")
+            .expected_output(serde_json::json!({"status": "ok"}))
+            .dependency("task1")
+            .dependency("task2")
+            .timeout(Duration::from_secs(30))
+            .retry_policy(RetryPolicy::fixed(3, 1000))
+            .build()
+            .unwrap();
+
+        assert_eq!(task.agent_name, "agent");
+        assert_eq!(task.input_key, "in");
+        assert_eq!(task.output_key, "out");
+        assert_eq!(task.description, Some("Test task".to_string()));
+        assert_eq!(task.expected_output, Some(serde_json::json!({"status": "ok"})));
+        assert_eq!(task.dependencies, vec!["task1", "task2"]);
+        assert_eq!(task.timeout, Some(Duration::from_secs(30)));
+        assert!(task.retry_policy.is_some());
+    }
+
+    #[test]
+    fn test_task_builder_dependencies_vec() {
+        let task = TaskBuilder::new("agent", "in", "out")
+            .dependencies(vec!["task1".to_string(), "task2".to_string(), "task3".to_string()])
+            .build()
+            .unwrap();
+
+        assert_eq!(task.dependencies, vec!["task1", "task2", "task3"]);
+    }
+
+    #[test]
+    fn test_task_builder_build_unchecked() {
+        let task = TaskBuilder::new("agent", "in", "out")
+            .description("Test")
+            .build_unchecked();
+
+        assert_eq!(task.agent_name, "agent");
+    }
+
+    #[test]
+    fn test_task_validate() {
+        let task = Task::new("agent", "in", "out");
+        assert!(task.validate().is_ok());
+
+        let empty_agent = Task::new("", "in", "out");
+        assert!(matches!(
+            empty_agent.validate(),
+            Err(TaskValidationError::EmptyAgentName)
+        ));
+
+        let empty_input = Task::new("agent", "", "out");
+        assert!(matches!(
+            empty_input.validate(),
+            Err(TaskValidationError::EmptyInputKey)
+        ));
+
+        let empty_output = Task::new("agent", "in", "");
+        assert!(matches!(
+            empty_output.validate(),
+            Err(TaskValidationError::EmptyOutputKey)
+        ));
+    }
+
+    #[test]
+    fn test_task_validate_output() {
+        let mut task = Task::new("agent", "in", "out");
+        task.expected_output = Some(serde_json::json!(42));
+
+        assert!(task.validate_output(&serde_json::json!(42)).is_ok());
+        assert!(task.validate_output(&serde_json::json!(10)).is_err());
+    }
+
+    #[test]
+    fn test_retry_policy_fixed() {
+        let policy = RetryPolicy::fixed(5, 1000);
+        assert_eq!(policy.max_retries, 5);
+        assert_eq!(policy.backoff, BackoffStrategy::Fixed(Duration::from_millis(1000)));
+        assert_eq!(policy.delay_for(0), Some(Duration::from_millis(1000)));
+        assert_eq!(policy.delay_for(4), Some(Duration::from_millis(1000)));
+        assert_eq!(policy.delay_for(5), None);
+    }
+
+    #[test]
+    fn test_retry_policy_exponential() {
+        let policy = RetryPolicy::exponential(3, 100, 5000);
+        assert_eq!(policy.max_retries, 3);
+        // delay_for returns None if attempt >= max_retries
+        assert_eq!(policy.delay_for(0), Some(Duration::from_millis(100)));
+        assert_eq!(policy.delay_for(1), Some(Duration::from_millis(200)));
+        assert_eq!(policy.delay_for(2), Some(Duration::from_millis(400)));
+        // Attempt 3 is at max_retries, so returns None
+        assert_eq!(policy.delay_for(3), None);
+    }
+
+    #[test]
+    fn test_backoff_strategy_exponential_cap() {
+        let strategy = BackoffStrategy::exponential(100, 500);
+        // 100 * 2^0 = 100
+        assert_eq!(strategy.delay(0), Duration::from_millis(100));
+        // 100 * 2^1 = 200
+        assert_eq!(strategy.delay(1), Duration::from_millis(200));
+        // 100 * 2^2 = 400
+        assert_eq!(strategy.delay(2), Duration::from_millis(400));
+        // 100 * 2^3 = 800 > 500, so cap at 500
+        assert_eq!(strategy.delay(3), Duration::from_millis(500));
+        // 100 * 2^10 = 102400 > 500, so cap at 500
+        assert_eq!(strategy.delay(10), Duration::from_millis(500));
     }
 }

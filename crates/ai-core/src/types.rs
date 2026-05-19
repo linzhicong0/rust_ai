@@ -448,6 +448,8 @@ pub enum AgentEvent {
 mod tests {
     use super::*;
 
+    // REQ-1.2: ModelConfig Tests
+
     #[test]
     fn test_model_config_builder() {
         let config = ModelConfig::new("gpt-4")
@@ -479,12 +481,218 @@ mod tests {
     }
 
     #[test]
+    fn test_model_config_merge_with_model_override() {
+        let base = ModelConfig::new("gpt-4")
+            .with_temperature(0.7);
+
+        let override_config = ModelConfig::new("claude-3-opus-20240229");
+
+        let merged = base.merge_with(&override_config);
+
+        // Model from override is always used
+        assert_eq!(merged.model, "claude-3-opus-20240229");
+        // Base temperature is preserved
+        assert_eq!(merged.temperature, Some(0.7));
+    }
+
+    #[test]
+    fn test_model_config_merge_preserves_all_fields() {
+        let base = ModelConfig::new("gpt-4")
+            .with_temperature(0.7)
+            .with_max_tokens(1000)
+            .with_top_p(0.9)
+            .with_frequency_penalty(0.5)
+            .with_presence_penalty(0.3)
+            .with_stop_sequences(vec!["END".to_string()]);
+
+        let override_config = ModelConfig::new("gpt-4")
+            .with_temperature(0.5);
+
+        let merged = base.merge_with(&override_config);
+
+        assert_eq!(merged.temperature, Some(0.5));
+        assert_eq!(merged.max_tokens, Some(1000));
+        assert_eq!(merged.top_p, Some(0.9));
+        assert_eq!(merged.frequency_penalty, Some(0.5));
+        assert_eq!(merged.presence_penalty, Some(0.3));
+        assert_eq!(merged.stop_sequences, Some(vec!["END".to_string()]));
+    }
+
+    #[test]
+    fn test_model_config_presets_gpt4() {
+        let config = ModelConfig::gpt4();
+        assert_eq!(config.model, "gpt-4");
+        assert_eq!(config.temperature, Some(0.7));
+        assert_eq!(config.max_tokens, Some(4096));
+    }
+
+    #[test]
+    fn test_model_config_presets_gpt35_turbo() {
+        let config = ModelConfig::gpt35_turbo();
+        assert_eq!(config.model, "gpt-3.5-turbo");
+        assert_eq!(config.temperature, Some(0.7));
+        assert_eq!(config.max_tokens, Some(4096));
+    }
+
+    #[test]
+    fn test_model_config_presets_claude_opus() {
+        let config = ModelConfig::claude_opus();
+        assert_eq!(config.model, "claude-3-opus-20240229");
+        assert_eq!(config.temperature, Some(0.7));
+        assert_eq!(config.max_tokens, Some(4096));
+    }
+
+    #[test]
+    fn test_model_config_presets_claude_sonnet() {
+        let config = ModelConfig::claude_sonnet();
+        assert_eq!(config.model, "claude-3-sonnet-20240229");
+        assert_eq!(config.temperature, Some(0.7));
+        assert_eq!(config.max_tokens, Some(4096));
+    }
+
+    #[test]
+    fn test_model_config_with_model_only() {
+        let config = ModelConfig::new("gpt-4")
+            .with_temperature(0.7)
+            .with_max_tokens(1000)
+            .with_top_p(0.9);
+
+        let model_only = config.with_model_only();
+
+        assert_eq!(model_only.model, "gpt-4");
+        assert_eq!(model_only.temperature, None);
+        assert_eq!(model_only.max_tokens, None);
+        assert_eq!(model_only.top_p, None);
+    }
+
+    #[test]
+    fn test_model_config_default() {
+        let config = ModelConfig::default();
+        assert_eq!(config.model, "gpt-4");
+    }
+
+    #[test]
+    fn test_model_config_from_str() {
+        let config: ModelConfig = "gpt-4".into();
+        assert_eq!(config.model, "gpt-4");
+    }
+
+    #[test]
+    fn test_model_config_from_string() {
+        let config: ModelConfig = String::from("claude-3-opus").into();
+        assert_eq!(config.model, "claude-3-opus");
+    }
+
+    #[test]
+    #[should_panic(expected = "temperature must be between 0.0 and 2.0")]
+    fn test_model_config_temperature_too_high() {
+        ModelConfig::new("gpt-4").with_temperature(2.5);
+    }
+
+    #[test]
+    #[should_panic(expected = "temperature must be between 0.0 and 2.0")]
+    fn test_model_config_temperature_too_low() {
+        ModelConfig::new("gpt-4").with_temperature(-0.1);
+    }
+
+    #[test]
+    #[should_panic(expected = "top_p must be between 0.0 and 1.0")]
+    fn test_model_config_top_p_too_high() {
+        ModelConfig::new("gpt-4").with_top_p(1.5);
+    }
+
+    #[test]
+    #[should_panic(expected = "top_p must be between 0.0 and 1.0")]
+    fn test_model_config_top_p_negative() {
+        ModelConfig::new("gpt-4").with_top_p(-0.1);
+    }
+
+    #[test]
+    #[should_panic(expected = "frequency_penalty must be between -2.0 and 2.0")]
+    fn test_model_config_frequency_penalty_too_high() {
+        ModelConfig::new("gpt-4").with_frequency_penalty(2.5);
+    }
+
+    #[test]
+    #[should_panic(expected = "frequency_penalty must be between -2.0 and 2.0")]
+    fn test_model_config_frequency_penalty_too_low() {
+        ModelConfig::new("gpt-4").with_frequency_penalty(-2.5);
+    }
+
+    #[test]
+    #[should_panic(expected = "presence_penalty must be between -2.0 and 2.0")]
+    fn test_model_config_presence_penalty_too_high() {
+        ModelConfig::new("gpt-4").with_presence_penalty(2.5);
+    }
+
+    #[test]
+    #[should_panic(expected = "presence_penalty must be between -2.0 and 2.0")]
+    fn test_model_config_presence_penalty_too_low() {
+        ModelConfig::new("gpt-4").with_presence_penalty(-2.5);
+    }
+
+    #[test]
+    fn test_model_config_boundary_values() {
+        // Test boundary values that should NOT panic
+        let _ = ModelConfig::new("gpt-4")
+            .with_temperature(0.0)
+            .with_temperature(2.0)
+            .with_top_p(0.0)
+            .with_top_p(1.0)
+            .with_frequency_penalty(-2.0)
+            .with_frequency_penalty(2.0)
+            .with_presence_penalty(-2.0)
+            .with_presence_penalty(2.0);
+    }
+
+    #[test]
     fn test_message_constructors() {
         let user_msg = Message::user("hello");
-        assert_eq!(user_msg.role, Role::User);
+        assert!(matches!(user_msg.role, Role::User));
+        assert_eq!(user_msg.content.as_text(), Some("hello"));
 
         let system_msg = Message::system("You are helpful");
-        assert_eq!(system_msg.role, Role::System);
+        assert!(matches!(system_msg.role, Role::System));
+        assert_eq!(system_msg.content.as_text(), Some("You are helpful"));
+
+        let assistant_msg = Message::assistant("Hello!");
+        assert!(matches!(assistant_msg.role, Role::Assistant));
+        assert_eq!(assistant_msg.content.as_text(), Some("Hello!"));
+
+        let tool_msg = Message::tool("call_123", "Result");
+        assert!(matches!(tool_msg.role, Role::Tool));
+        assert_eq!(tool_msg.content.as_text(), Some("Result"));
+    }
+
+    #[test]
+    fn test_content_text() {
+        let content = Content::text("hello");
+        assert_eq!(content.as_text(), Some("hello"));
+    }
+
+    #[test]
+    fn test_content_multi() {
+        let parts = vec![
+            ContentPart::Text("Hello".to_string()),
+            ContentPart::Image {
+                url: "https://example.com/image.jpg".to_string(),
+                media_type: "image/jpeg".to_string(),
+            },
+        ];
+        let content = Content::multi(parts);
+        assert!(matches!(content, Content::MultiPart(_)));
+    }
+
+    #[test]
+    fn test_content_from_string() {
+        let content: Content = String::from("hello").into();
+        assert_eq!(content.as_text(), Some("hello"));
+    }
+
+    #[test]
+    fn test_content_from_str() {
+        let content: Content = "hello".into();
+        assert_eq!(content.as_text(), Some("hello"));
     }
 
     #[test]
@@ -498,5 +706,29 @@ mod tests {
         // GPT-4 pricing (example)
         let cost = usage.estimated_cost(30.0, 60.0);
         assert!((cost - 0.06).abs() < 0.001); // ~6 cents
+    }
+
+    #[test]
+    fn test_usage_cost_estimation_zero_tokens() {
+        let usage = Usage {
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+        };
+
+        let cost = usage.estimated_cost(30.0, 60.0);
+        assert_eq!(cost, 0.0);
+    }
+
+    #[test]
+    fn test_usage_cost_estimation_large_tokens() {
+        let usage = Usage {
+            prompt_tokens: 1_000_000,
+            completion_tokens: 500_000,
+            total_tokens: 1_500_000,
+        };
+
+        let cost = usage.estimated_cost(10.0, 20.0);
+        assert_eq!(cost, 20.0); // $10 for prompts + $10 for completions
     }
 }

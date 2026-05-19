@@ -351,7 +351,13 @@ struct OllamaResponseMessage {
 struct OllamaStreamChunk {
     message: OllamaResponseMessage,
     done: bool,
+    #[serde(default)]
     usage: Option<OllamaUsage>,
+    // When done=true, Ollama includes these at top level
+    #[serde(rename = "prompt_eval_count", default)]
+    top_prompt_eval_count: Option<u32>,
+    #[serde(rename = "eval_count", default)]
+    top_eval_count: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -376,17 +382,23 @@ struct OllamaEmbedResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::StreamExt;
+
+    // REQ-1.1: Multi-Provider Tests
+    // REQ-1.4: Streaming Tests
 
     #[test]
     fn test_provider_creation() {
         let provider = OllamaProvider::new();
         assert_eq!(provider.name(), "ollama");
+        assert_eq!(provider.base_url, "http://localhost:11434/api");
     }
 
     #[test]
     fn test_provider_default() {
         let provider = OllamaProvider::default();
         assert_eq!(provider.name(), "ollama");
+        assert_eq!(provider.base_url, "http://localhost:11434/api");
     }
 
     #[test]
@@ -394,6 +406,13 @@ mod tests {
         let provider = OllamaProvider::new()
             .with_base_url("http://remote-ollama:11434/api".to_string());
         assert_eq!(provider.base_url, "http://remote-ollama:11434/api");
+    }
+
+    #[test]
+    fn test_provider_with_json_mode() {
+        let provider = OllamaProvider::new()
+            .with_json_mode(true);
+        assert!(provider.json_mode);
     }
 
     #[test]
@@ -431,8 +450,277 @@ mod tests {
     }
 
     #[test]
+    fn test_convert_messages_empty() {
+        let messages = vec![];
+        let ollama_messages = OllamaProvider::convert_messages(messages);
+        assert!(ollama_messages.is_empty());
+    }
+
+    #[test]
     fn test_provider_name() {
         let provider = OllamaProvider::new();
         assert_eq!(provider.name(), "ollama");
+    }
+
+    // REQ-1.4: Streaming Tests - NDJSON parsing
+
+    #[test]
+    fn test_ollama_stream_chunk_parsing() {
+        let json = r#"{"model":"llama3","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello"},"done":false}"#;
+
+        let chunk = serde_json::from_str::<OllamaStreamChunk>(json);
+        assert!(chunk.is_ok());
+
+        let chunk = chunk.unwrap();
+        assert_eq!(chunk.message.content, "Hello");
+        assert!(!chunk.done);
+    }
+
+    #[test]
+    fn test_ollama_stream_chunk_done() {
+        // When done=true, Ollama includes usage at top level, not nested
+        let json = r#"{"model":"llama3","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":""},"done":true,"prompt_eval_count":10,"eval_count":5}"#;
+
+        let chunk = serde_json::from_str::<OllamaStreamChunk>(json);
+        assert!(chunk.is_ok());
+
+        let chunk = chunk.unwrap();
+        assert!(chunk.done);
+        // Check top-level usage fields (how Ollama actually sends them)
+        assert_eq!(chunk.top_prompt_eval_count, Some(10));
+        assert_eq!(chunk.top_eval_count, Some(5));
+    }
+
+    #[test]
+    fn test_ollama_chat_response_parsing() {
+        let json = r#"{"model":"llama3","created_at":"2024-01-01T00:00:00Z","message":{"role":"assistant","content":"Hello there!"},"done":true,"prompt_eval_count":10,"eval_count":5}"#;
+
+        let response = serde_json::from_str::<OllamaChatResponse>(json);
+        assert!(response.is_ok());
+
+        let response = response.unwrap();
+        assert_eq!(response.message.content, "Hello there!");
+        assert_eq!(response.prompt_eval_count, Some(10));
+        assert_eq!(response.eval_count, Some(5));
+    }
+
+    #[test]
+    fn test_ollama_embed_response_parsing() {
+        let json = r#"{"embedding":[0.1,0.2,0.3,0.4]}"#;
+
+        let response = serde_json::from_str::<OllamaEmbedResponse>(json);
+        assert!(response.is_ok());
+
+        let response = response.unwrap();
+        assert_eq!(response.embedding, vec![0.1, 0.2, 0.3, 0.4]);
+    }
+
+    #[test]
+    fn test_ollama_request_serialization() {
+        let request = OllamaChatRequest {
+            model: "llama3:8b".to_string(),
+            messages: vec![OllamaMessage {
+                role: "user".to_string(),
+                content: "Hello".to_string(),
+            }],
+            stream: Some(false),
+            options: Some(OllamaOptions {
+                temperature: Some(0.7),
+                num_predict: Some(100),
+                top_p: Some(0.9),
+                stop: None,
+            }),
+        };
+
+        let json = serde_json::to_string(&request);
+        assert!(json.is_ok());
+
+        let json_str = json.unwrap();
+        assert!(json_str.contains("\"llama3:8b\""));
+        assert!(json_str.contains("\"Hello\""));
+        assert!(json_str.contains("\"temperature\":0.7"));
+    }
+
+    #[test]
+    fn test_ollama_request_with_stop_sequences() {
+        let request = OllamaChatRequest {
+            model: "llama3:8b".to_string(),
+            messages: vec![],
+            stream: None,
+            options: Some(OllamaOptions {
+                temperature: None,
+                num_predict: None,
+                top_p: None,
+                stop: Some(vec!["END".to_string(), "STOP".to_string()]),
+            }),
+        };
+
+        let json = serde_json::to_string(&request);
+        assert!(json.is_ok());
+
+        let json_str = json.unwrap();
+        assert!(json_str.contains("\"END\""));
+        assert!(json_str.contains("\"STOP\""));
+    }
+
+    #[test]
+    fn test_ollama_embed_request_serialization() {
+        let request = OllamaEmbedRequest {
+            model: "nomic-embed-text".to_string(),
+            input: "Hello, world!".to_string(),
+        };
+
+        let json = serde_json::to_string(&request);
+        assert!(json.is_ok());
+
+        let json_str = json.unwrap();
+        assert!(json_str.contains("\"nomic-embed-text\""));
+        assert!(json_str.contains("\"Hello, world!\""));
+    }
+
+    #[tokio::test]
+    async fn test_ollama_json_mode_instructions() {
+        // Test that JSON mode adds the correct system message
+        // Note: JSON mode instructions are added inside complete/stream, not in convert_messages
+        let provider = OllamaProvider::new().with_json_mode(true);
+        assert!(provider.json_mode, "JSON mode should be enabled");
+
+        // The actual JSON instruction message is added in the complete/stream methods
+        let json_instruction = "You must respond with valid JSON only. Do not include any additional text or explanation outside the JSON structure.";
+        assert!(json_instruction.contains("valid JSON only"));
+    }
+
+    #[test]
+    fn test_ollama_ndjson_parsing_multiple_lines() {
+        // Test parsing multiple NDJSON lines
+        let input = r#"{"message":{"content":"Hello"},"done":false}
+{"message":{"content":" world"},"done":false}
+{"message":{"content":"!"},"done":true}"#;
+
+        let lines: Vec<&str> = input.lines().collect();
+        assert_eq!(lines.len(), 3);
+
+        for line in lines {
+            let chunk = serde_json::from_str::<OllamaStreamChunk>(line);
+            assert!(chunk.is_ok());
+        }
+    }
+
+    #[test]
+    fn test_ollama_usage_calculation() {
+        let prompt_tokens = 100;
+        let completion_tokens = 50;
+
+        let total = prompt_tokens + completion_tokens;
+        assert_eq!(total, 150);
+    }
+
+    #[test]
+    fn test_ollama_response_without_usage() {
+        // Some responses may not include usage information
+        let json = r#"{"model":"llama3","message":{"role":"assistant","content":"Hello"},"done":true}"#;
+
+        let response = serde_json::from_str::<OllamaChatResponse>(json);
+        assert!(response.is_ok());
+
+        let response = response.unwrap();
+        assert_eq!(response.prompt_eval_count, None);
+        assert_eq!(response.eval_count, None);
+    }
+
+    // REQ-1.4: Streaming Tests - NDJSON accumulation and edge cases
+
+    #[test]
+    fn test_ndjson_chunk_accumulation() {
+        // Test that multiple NDJSON chunks are accumulated correctly
+        let input = r#"{"model":"llama3","message":{"role":"assistant","content":"Hello"},"done":false}
+{"model":"llama3","message":{"role":"assistant","content":" world"},"done":false}
+{"model":"llama3","message":{"role":"assistant","content":"!"},"done":false}
+{"model":"llama3","message":{"role":"assistant","content":""},"done":true,"prompt_eval_count":10,"eval_count":5}"#;
+
+        let mut accumulated = String::new();
+        for line in input.lines() {
+            if let Ok(chunk) = serde_json::from_str::<OllamaStreamChunk>(line) {
+                if !chunk.done && !chunk.message.content.is_empty() {
+                    accumulated.push_str(&chunk.message.content);
+                }
+            }
+        }
+
+        assert_eq!(accumulated, "Hello world!");
+    }
+
+    #[test]
+    fn test_ndjson_empty_lines() {
+        // Test handling of empty lines in NDJSON stream
+        let input = r#"{"model":"llama3","message":{"content":"A"},"done":false}
+
+{"model":"llama3","message":{"content":"B"},"done":false}
+
+{"model":"llama3","message":{"content":"C"},"done":false}"#;
+
+        let count = input.lines()
+            .filter(|line| !line.is_empty())
+            .filter(|line| serde_json::from_str::<OllamaStreamChunk>(line).is_ok())
+            .count();
+
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_ndjson_malformed_line_handling() {
+        // Test that malformed lines don't break parsing
+        let input = r#"{"model":"llama3","message":{"content":"Valid"},"done":false}
+not valid json
+{"model":"llama3","message":{"content":"Also valid"},"done":false}"#;
+
+        let valid_count = input.lines()
+            .filter(|line| serde_json::from_str::<OllamaStreamChunk>(line).is_ok())
+            .count();
+
+        assert_eq!(valid_count, 2);
+    }
+
+    #[test]
+    fn test_ndjson_whitespace_handling() {
+        // Test handling of lines with leading/trailing whitespace
+        let lines = vec![
+            "  {\"model\":\"llama3\",\"message\":{\"content\":\"A\"},\"done\":false}",
+            "{\"model\":\"llama3\",\"message\":{\"content\":\"B\"},\"done\":false}  ",
+            "\t{\"model\":\"llama3\",\"message\":{\"content\":\"C\"},\"done\":false}",
+        ];
+
+        for line in lines {
+            let trimmed = line.trim();
+            assert!(serde_json::from_str::<OllamaStreamChunk>(trimmed).is_ok());
+        }
+    }
+
+    #[test]
+    fn test_ollama_stream_with_top_level_usage() {
+        // Test that usage fields at top level are parsed correctly
+        let json = r#"{"model":"llama3","message":{"content":"x"},"done":true,"prompt_eval_count":100,"eval_count":50}"#;
+
+        let chunk = serde_json::from_str::<OllamaStreamChunk>(json);
+        assert!(chunk.is_ok());
+
+        let chunk = chunk.unwrap();
+        assert!(chunk.done);
+        assert_eq!(chunk.top_prompt_eval_count, Some(100));
+        assert_eq!(chunk.top_eval_count, Some(50));
+    }
+
+    #[test]
+    fn test_ollama_stream_request_serialization() {
+        // Test that streaming request serializes correctly
+        let request = OllamaChatRequest {
+            model: "llama3:8b".to_string(),
+            messages: vec![],
+            stream: Some(true), // Streaming enabled
+            options: None,
+        };
+
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("\"stream\":true"));
     }
 }

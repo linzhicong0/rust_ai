@@ -6,41 +6,42 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use ai_core::{Provider, ModelConfig};
-//! use ai_core::types::{Message, Role, Content};
-//!
+//! # use ai_core::{Provider, ModelConfig, ToolDescriptor};
+//! # use ai_core::types::{Message, CompletionResponse, StreamChunk};
+//! # use ai_core::error::ProviderError;
+//! # use futures::stream::BoxStream;
 //! struct MyProvider;
 //!
-//! #[async_trait::async_trait]
+//! # #[async_trait::async_trait]
 //! impl Provider for MyProvider {
-//!     async fn complete(
-//!         &self,
-//!         messages: Vec<Message>,
-//!         config: &ModelConfig,
-//!         tools: &[ToolDescriptor],
-//!     ) -> Result<CompletionResponse, ProviderError> {
+//! #     async fn complete(
+//! #         &self,
+//! #         messages: Vec<Message>,
+//! #         config: &ModelConfig,
+//! #         tools: &[ToolDescriptor],
+//! #     ) -> Result<CompletionResponse, ProviderError> {
 //!         // Implementation...
 //!         # todo!()
-//!     }
+//! #     }
 //!
-//!     fn stream(
-//!         &self,
-//!         messages: Vec<Message>,
-//!         config: &ModelConfig,
-//!         tools: &[ToolDescriptor],
-//!     ) -> futures::stream::BoxStream<'static, Result<StreamChunk, ProviderError>> {
+//! #     fn stream(
+//! #         &self,
+//! #         messages: Vec<Message>,
+//! #         config: &ModelConfig,
+//! #         tools: &[ToolDescriptor],
+//! #     ) -> BoxStream<'static, Result<StreamChunk, ProviderError>> {
 //!         // Implementation...
 //!         # Box::pin(futures::stream::empty())
-//!     }
+//! #     }
 //!
-//!     async fn embed(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>, ProviderError> {
+//! #     async fn embed(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>, ProviderError> {
 //!         // Implementation...
 //!         # todo!()
-//!     }
+//! #     }
 //!
-//!     fn name(&self) -> &str {
+//! #     fn name(&self) -> &str {
 //!         "my-provider"
-//!     }
+//! #     }
 //! }
 //! ```
 

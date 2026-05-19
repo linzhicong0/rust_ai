@@ -118,7 +118,7 @@ impl Plan {
     /// Get steps in topological order (dependencies before dependents).
     ///
     /// Returns `None` if circular dependencies are detected.
-    pub fn execution_order(&self) -> Option<Vec<&PlanStep>> {
+    pub fn execution_order(&self) -> Option<Vec<PlanStep>> {
         if self.has_circular_dependencies() {
             return None;
         }
@@ -128,22 +128,25 @@ impl Plan {
 
         while !remaining.is_empty() {
             // Find steps with no unmet dependencies
-            let ready: Vec<_> = remaining
+            let ready_ids: Vec<String> = remaining
                 .iter()
                 .filter(|step| {
                     step.dependencies
                         .iter()
-                        .all(|dep| result.iter().any(|s| s.id == *dep))
+                        .all(|dep| result.iter().any(|s: &PlanStep| s.id == *dep))
                 })
+                .map(|s| s.id.clone())
                 .collect();
 
-            if ready.is_empty() {
+            if ready_ids.is_empty() {
                 // Circular dependency or other issue
                 return None;
             }
 
-            for step in ready {
-                result.push(remaining.remove(remaining.iter().position(|s| s.id == step.id)?));
+            for id in ready_ids {
+                if let Some(pos) = remaining.iter().position(|s| s.id == id) {
+                    result.push(remaining.remove(pos));
+                }
             }
         }
 

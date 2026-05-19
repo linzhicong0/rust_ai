@@ -58,7 +58,7 @@ pub use pipeline::{Pipeline, PipelineBuilder};
 pub use context::PipelineContext;
 pub use step::{
     Step, StepKind, Condition, LoopCondition,
-    Task, RetryPolicy, BackoffStrategy, TaskValidationError,
+    Task, TaskBuilder, RetryPolicy, BackoffStrategy, TaskValidationError,
 };
 
 // Re-export error from ai-core

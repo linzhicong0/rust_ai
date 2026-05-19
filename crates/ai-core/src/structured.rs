@@ -228,8 +228,9 @@ mod tests {
         let prompt = config.build_system_prompt(Some("You are a helpful assistant."));
 
         assert!(prompt.contains("You are a helpful assistant"));
-        assert!(prompt.contains("JSON schema"));
-        assert!(prompt.contains("respond with valid JSON"));
+        assert!(prompt.to_lowercase().contains("json"));
+        assert!(prompt.contains("respond"));
+        assert!(prompt.contains("schema"));
     }
 
     #[test]

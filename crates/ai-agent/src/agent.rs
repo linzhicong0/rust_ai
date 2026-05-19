@@ -15,11 +15,48 @@ use ai_core::memory::{Memory, MemoryEntry};
 use ai_core::provider::Provider;
 use ai_core::tool::{Tool, ToolDescriptor, ToolOutput};
 use ai_core::types::{
-    AgentEvent, AgentOutput, CompletionResponse, Content, Message,
-    ModelConfig, Role, ToolCall, Usage,
+    AgentEvent, AgentOutput, CompletionResponse, Content, FinishReason, Message,
+    ModelConfig, Role, StreamChunk, ToolCall, Usage,
 };
 
-use super::builder::AgentInner;
+// AgentInner is defined below in this module
+
+/// Internal state of an Agent.
+pub struct AgentInner<P, M>
+where
+    P: Provider + 'static,
+    M: Memory + 'static,
+{
+    pub(crate) provider: P,
+    pub(crate) memory: M,
+    pub(crate) role: Option<String>,
+    pub(crate) goal: Option<String>,
+    pub(crate) backstory: Option<String>,
+    pub(crate) tools: Vec<Box<dyn Tool>>,
+    pub(crate) model_config: ModelConfig,
+    pub(crate) max_iterations: u32,
+}
+
+// Implement Clone for AgentInner where both P and M are Clone
+// Note: Tools are not cloned, only the references
+impl<P, M> Clone for AgentInner<P, M>
+where
+    P: Provider + Clone,
+    M: Memory + Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            provider: self.provider.clone(),
+            memory: self.memory.clone(),
+            role: self.role.clone(),
+            goal: self.goal.clone(),
+            backstory: self.backstory.clone(),
+            tools: Vec::new(), // Tools need to be re-added after clone
+            model_config: self.model_config.clone(),
+            max_iterations: self.max_iterations,
+        }
+    }
+}
 
 /// An AI agent that can reason, act, and observe using tools.
 ///
@@ -68,16 +105,16 @@ use super::builder::AgentInner;
 /// ```
 pub struct Agent<P, M>
 where
-    P: Provider,
-    M: Memory,
+    P: Provider + 'static,
+    M: Memory + 'static,
 {
     pub(crate) inner: Arc<AgentInner<P, M>>,
 }
 
 impl<P, M> Agent<P, M>
 where
-    P: Provider,
-    M: Memory,
+    P: Provider + 'static,
+    M: Memory + 'static,
 {
     /// Get the provider this agent uses.
     pub fn provider(&self) -> &P {
@@ -201,7 +238,7 @@ where
         Box::pin(async_stream::try_stream! {
             let mut messages = agent.build_initial_messages(&input).await?;
 
-            for iteration in 0..agent.inner.max_iterations {
+            for _iteration in 0..agent.inner.max_iterations {
                 let mut stream = agent.inner.provider.stream(
                     messages.clone(),
                     &agent.inner.model_config,
@@ -209,7 +246,7 @@ where
                 );
 
                 let mut content_buffer = String::new();
-                let mut tool_calls_buffer = Vec::new();
+                let tool_calls_buffer: Vec<ToolCall> = Vec::new();
 
                 while let Some(chunk_result) = stream.next().await {
                     let chunk = chunk_result?;
@@ -224,7 +261,7 @@ where
                         let entry = MemoryEntry::new(Role::Assistant, &content_buffer);
                         agent.inner.memory.add(entry).await?;
 
-                        if finish_reason != ai_core::types::FinishReason::ToolCalls {
+                        if !matches!(finish_reason, FinishReason::ToolCalls) {
                             // Done without tool calls
                             return;
                         }
@@ -326,7 +363,11 @@ where
     }
 
     /// Add a tool to this agent.
-    pub fn with_tool<T: Tool + 'static>(self, tool: T) -> Agent<P, M> {
+    pub fn with_tool<T: Tool + 'static>(self, tool: T) -> Agent<P, M>
+    where
+        P: Provider + Clone,
+        M: Memory + Clone,
+    {
         let mut inner = (*self.inner).clone();
         inner.tools.push(Box::new(tool));
         Agent { inner: Arc::new(inner) }
@@ -336,8 +377,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::builder::AgentBuilder;
+    use ai_core::error::{ProviderError, ToolError};
     use ai_core::tool::{ToolDescriptor, ToolOutput};
-    use ai_core::types::Role;
+    use ai_core::types::{FinishReason, Message, Role, ToolCall, Usage};
     use ai_memory::InMemoryMemory;
     use serde_json::json;
 
@@ -363,6 +406,7 @@ mod tests {
     }
 
     // Mock provider for testing
+    #[derive(Clone)]
     struct MockProvider {
         response_content: String,
         tool_calls: Vec<ToolCall>,
@@ -656,7 +700,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_with_tool_adds_tool() {
-        let memory = InMemoryMemory::new(100);
+        use ai_memory::SharedMemory;
+        let memory = SharedMemory::new(InMemoryMemory::new(100));
         let provider = MockProvider::new_response("Hello!");
 
         let tool1 = MockTool {

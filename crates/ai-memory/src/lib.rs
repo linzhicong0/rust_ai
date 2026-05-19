@@ -15,24 +15,24 @@
 //!
 //! ```rust,no_run
 //! use ai_memory::ThreadScopedMemory;
-//! use ai_core::{Memory, MemoryEntry};
+//! use ai_core::memory::{MemoryEntry, ScopedMemory};
 //! use ai_core::types::Role;
 //!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Thread-scoped memory maintains separate conversation histories
-//! let memory = ThreadScopedMemory::new();
+//! let memory = ThreadScopedMemory::new(100);
 //!
 //! let session_id = "user-123-session-1";
 //!
 //! // Add messages to this specific session
-//! memory.add(
+//! memory.add_to_scope(
 //!     session_id,
 //!     MemoryEntry::new(Role::User, "Hello!")
 //! ).await?;
 //!
 //! // Retrieve only this session's history
-//! let history = memory.get(session_id, None).await?;
+//! let history = memory.get_from_scope(session_id, None).await?;
 //! # Ok(())
 //! # }
 //! ```

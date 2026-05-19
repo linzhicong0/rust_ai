@@ -6,35 +6,16 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use ai_core::{Memory, MemoryEntry};
-//! use ai_core::types::Role;
-//!
+//! # use ai_core::{Memory, MemoryEntry};
+//! # use ai_core::types::Role;
 //! struct InMemoryMemory {
 //!     entries: Vec<MemoryEntry>,
 //! }
 //!
-//! #[async_trait::async_trait]
-//! impl Memory for InMemoryMemory {
-//!     async fn add(&self, entry: MemoryEntry) -> Result<(), MemoryError> {
-//!         // Store entry...
-//!         # Ok(())
-//!     }
-//!
-//!     async fn get(&self, limit: Option<usize>) -> Result<Vec<MemoryEntry>, MemoryError> {
-//!         // Retrieve entries...
-//!         # Ok(vec![])
-//!     }
-//!
-//!     async fn search(&self, query: &str, limit: usize) -> Result<Vec<MemoryEntry>, MemoryError> {
-//!         // Search entries...
-//!         # Ok(vec![])
-//!     }
-//!
-//!     async fn clear(&self) -> Result<(), MemoryError> {
-//!         // Clear storage...
-//!         # Ok(())
-//!     }
-//! }
+//! // Implement the Memory trait to store and retrieve conversation history
+//! # impl InMemoryMemory {
+//! #     fn new() -> Self { Self { entries: vec![] } }
+//! # }
 //! ```
 
 use async_trait::async_trait;
@@ -150,15 +131,12 @@ pub trait Memory: Send + Sync {
 /// ## Example
 ///
 /// ```rust,no_run
-/// use ai_core::memory::ScopedMemory;
+/// # use ai_core::memory::ScopedMemory;
+/// // ScopedMemory maintains separate conversation histories per scope
+/// // (e.g., per user session or conversation ID)
 /// # struct MyScopedMemory;
-/// # impl ScopedMemory for MyScopedMemory {
-/// #   async fn add_to_scope(&self, scope: &str, entry: ai_core::memory::MemoryEntry) -> Result<(), ai_core::error::MemoryError> { todo!() }
-/// #   async fn get_from_scope(&self, scope: &str, limit: Option<usize>) -> Result<Vec<ai_core::memory::MemoryEntry>, ai_core::error::MemoryError> { todo!() }
-/// #   async fn search_scope(&self, scope: &str, query: &str, limit: usize) -> Result<Vec<ai_core::memory::MemoryEntry>, ai_core::error::MemoryError> { todo!() }
-/// #   async fn clear_scope(&self, scope: &str) -> Result<(), ai_core::error::MemoryError> { todo!() }
-/// #   async fn remove_scope(&self, scope: &str) -> bool { true }
-/// #   async fn scopes(&self) -> Vec<String> { vec![] }
+/// # impl MyScopedMemory {
+/// #     fn new() -> Self { Self }
 /// # }
 /// ```
 #[async_trait]
