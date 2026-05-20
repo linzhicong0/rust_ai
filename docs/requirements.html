@@ -554,6 +554,119 @@
     background: linear-gradient(90deg, var(--accent), var(--green));
     transition: width 0.4s;
   }
+
+  /* Expandable test & acceptance section */
+  .req-card { cursor: pointer; }
+
+  .req-expand-section {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease,
+                margin-top 0.35s ease;
+    margin-top: 0;
+  }
+
+  .req-card.expanded .req-expand-section {
+    max-height: 1400px;
+    opacity: 1;
+    margin-top: 16px;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.35s ease 0.1s,
+                margin-top 0.35s ease;
+  }
+
+  .req-expand-divider {
+    border: none;
+    border-top: 1px dashed var(--border-light);
+    margin: 0 0 14px;
+  }
+
+  .test-group {
+    margin-bottom: 14px;
+  }
+  .test-group:last-child { margin-bottom: 0; }
+
+  .test-group-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .test-group-title.acceptance-title {
+    color: var(--green);
+  }
+  .test-group-title.acceptance-title::before {
+    content: '\2713';
+    font-size: 0.7rem;
+  }
+
+  .test-group-title.testcases-title {
+    color: var(--blue);
+  }
+  .test-group-title.testcases-title::before {
+    content: '\25B7';
+    font-size: 0.65rem;
+  }
+
+  .test-group ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .test-group ul li {
+    position: relative;
+    padding-left: 20px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1.85;
+  }
+
+  .test-group ul li::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 11px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+
+  .test-group.acceptance ul li::before {
+    background: var(--green);
+    opacity: 0.45;
+  }
+  .test-group.testcases ul li::before {
+    background: var(--blue);
+    opacity: 0.45;
+  }
+
+  .expand-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-top: 10px;
+    transition: color 0.2s;
+    user-select: none;
+  }
+  .expand-hint .arrow {
+    display: inline-block;
+    transition: transform 0.3s;
+    font-size: 0.6rem;
+  }
+  .req-card.expanded .expand-hint .arrow { transform: rotate(90deg); }
+  .req-card:hover .expand-hint { color: var(--text-muted); }
+  .req-card.expanded .expand-hint { color: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -1420,6 +1533,1258 @@ function filterCards(filter, btn) {
     card.style.display = show ? '' : 'none';
   });
 }
+
+// --- Test Cases & Acceptance Criteria ---
+const REQUIREMENT_TESTS = {
+  'REQ-15.3': {
+    acceptance: [
+      'Framework loads configuration from YAML, JSON, environment variables, and code with no panics',
+      'Config hierarchy is respected: defaults < file < env vars < code overrides',
+      'Missing or malformed config file falls back to defaults with a descriptive warning',
+      'API keys can be set exclusively via environment variables without any code changes'
+    ],
+    tests: [
+      'Unit: default config values match documented defaults when no overrides provided',
+      'Unit: YAML file overrides specific keys while leaving remaining defaults intact',
+      'Unit: env var OPENAI_API_KEY takes precedence over file-based key',
+      'Integration: full hierarchy chain (default -> file -> env -> code) produces expected merged config',
+      'Edge: malformed YAML/JSON file returns descriptive error, does not panic'
+    ]
+  },
+  'REQ-11.1': {
+    acceptance: [
+      'Every LLM request/response pair is logged with a timestamp',
+      'Log entries include input tokens, output tokens, and latency in milliseconds',
+      'Three verbosity levels supported: none, error-only, verbose — switchable at runtime',
+      'Structured JSON log output is valid and machine-parseable'
+    ],
+    tests: [
+      'Unit: verbose level logs full request body and complete response',
+      'Unit: error level only logs failed requests (non-2xx or parse errors)',
+      'Unit: none level produces zero log output',
+      'Integration: JSON output parses cleanly with no trailing commas or invalid syntax',
+      'Integration: 50 concurrent requests log without interleaving or data loss'
+    ]
+  },
+  'REQ-1.2': {
+    acceptance: [
+      'ModelConfig struct exposes temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop_sequences',
+      'Builder pattern allows chaining configuration without mutating defaults',
+      'Per-request overrides do not alter the shared default ModelConfig instance'
+    ],
+    tests: [
+      'Unit: set temperature to 0.7 and verify it appears in the resulting request',
+      'Unit: chain .temperature(0.5).max_tokens(100).top_p(0.9) compiles and applies all values',
+      'Unit: per-request override with different temperature does not mutate the default config',
+      'Unit: stop_sequences accepts a vector of strings and passes them to the provider'
+    ]
+  },
+  'REQ-15.1': {
+    acceptance: [
+      'Public API surface includes Client, Agent, Tool, Memory, Pipeline as top-level types',
+      'All public error types use thiserror or anyhow with descriptive messages',
+      'Builder patterns provided for all complex configuration structs'
+    ],
+    tests: [
+      'Unit: Client::builder().build() compiles and produces a valid Client instance',
+      'Unit: Agent::builder().role("analyst").build() compiles and sets the role field',
+      'Unit: Pipeline::builder().step(step).build() compiles and registers the step',
+      'Unit: Custom error types implement std::error::Error and Display traits',
+      'Doc: public items have rustdoc comments with at least one usage example'
+    ]
+  },
+  'REQ-4.1': {
+    acceptance: [
+      'Variable substitution works for {{variable}} syntax',
+      'Conditional blocks {{#if condition}}...{{/if}} render based on truthy/falsy evaluation',
+      'Template composition supports including partials from other template files'
+    ],
+    tests: [
+      'Unit: render("Hello {{name}}", {name: "World"}) produces "Hello World"',
+      'Unit: {{#if show}}visible{{/if}} with show=true renders "visible", show=false renders empty',
+      'Unit: {{>header}} includes the content of the "header" partial template',
+      'Edge: undefined variable renders empty string or configurable fallback, never panics',
+      'Edge: unclosed {{ tag returns a descriptive template parse error'
+    ]
+  },
+  'REQ-3.1': {
+    acceptance: [
+      'Tool trait defines name(), description(), schema(), and execute() methods',
+      'A derive macro or declarative macro reduces boilerplate for simple tool definitions',
+      'Both sync and async execute() variants compile and run correctly'
+    ],
+    tests: [
+      'Unit: struct implementing Tool trait returns correct name and description',
+      'Unit: schema() returns valid JSON Schema with type, properties, and required fields',
+      'Unit: execute() with valid input returns the expected output',
+      'Unit: async execute() with valid input returns the expected output via .await',
+      'Unit: macro-generated tool compiles and passes the same name/schema/execute checks'
+    ]
+  },
+  'REQ-9.1': {
+    acceptance: [
+      'JSON mode can be requested from providers that support it',
+      'Response is validated against the provided JSON Schema; invalid responses trigger re-prompt',
+      'Re-prompt on validation failure stops after a configurable retry limit (default 3)'
+    ],
+    tests: [
+      'Unit: request with json_mode=true sends the correct provider-specific parameter',
+      'Unit: valid JSON response passes schema validation and is returned to caller',
+      'Unit: invalid JSON response triggers re-prompt with error feedback appended',
+      'Unit: after 3 consecutive validation failures, returns StructuredOutputError',
+      'Integration: end-to-end structured extraction with re-prompt succeeds within retry limit'
+    ]
+  },
+  'REQ-1.1': {
+    acceptance: [
+      'Provider trait defines complete(), stream(), embed() methods',
+      'Implementations exist for OpenAI, Anthropic, Google, and Ollama providers',
+      'Provider-agnostic message types (User, Assistant, System, Tool) work across all providers'
+    ],
+    tests: [
+      'Unit: switch provider from OpenAI to Anthropic without changing message construction code',
+      'Unit: User, Assistant, System message types serialize correctly for each provider',
+      'Unit: Tool message type (function call result) serializes for each provider',
+      'Integration: complete() returns a normalized response regardless of which provider is active',
+      'Integration: stream() yields normalized chunks regardless of provider'
+    ]
+  },
+  'REQ-1.4': {
+    acceptance: [
+      'Streaming returns an async stream of tokens (impl Stream<Item = Chunk>)',
+      'Cancellation via CancellationToken or dropping the stream stops generation immediately',
+      'Stream can be collected/accumulated into a final response object'
+    ],
+    tests: [
+      'Unit: stream yields at least 2 chunks for a multi-token response',
+      'Unit: cancelling mid-stream stops receiving chunks within 500ms',
+      'Unit: dropping the stream handle cancels the underlying request',
+      'Unit: collecting all stream chunks produces the same text as a non-streaming request',
+      'Integration: streaming callback receives each token in order'
+    ]
+  },
+  'REQ-5.1': {
+    acceptance: [
+      'Memory trait defines add(), get(), clear() methods',
+      'In-memory implementation is the default and requires no external dependencies',
+      'Thread-scoped storage supports multiple concurrent conversation sessions'
+    ],
+    tests: [
+      'Unit: add() then get() returns the stored messages in order',
+      'Unit: clear() empties all messages for the given thread',
+      'Unit: two threads with different IDs have isolated message histories',
+      'Integration: 100 concurrent threads each add/get messages without cross-contamination'
+    ]
+  },
+  'REQ-2.1': {
+    acceptance: [
+      'Agent struct holds role, goal, backstory, model_config, tools, and memory',
+      'System prompt is auto-assembled from agent properties without manual construction',
+      'Agent execution loop supports: think -> act (tool call) -> observe -> respond'
+    ],
+    tests: [
+      'Unit: Agent::builder().role("researcher").goal("find facts").build() compiles',
+      'Unit: auto-assembled system prompt contains role, goal, and backstory sections',
+      'Unit: execution loop calls LLM, then conditionally calls tool, then feeds result back',
+      'Integration: full think-act-observe loop completes for a multi-turn tool-use scenario'
+    ]
+  },
+  'REQ-7.1': {
+    acceptance: [
+      'Pipeline builder supports .step(), .parallel(), .conditional(), .loop() methods',
+      'Pipeline context flows data between steps automatically',
+      'Pipeline-level error handling and timeout are configurable'
+    ],
+    tests: [
+      'Unit: sequential pipeline with 3 steps executes in order',
+      'Unit: parallel pipeline with 3 steps executes concurrently and collects all results',
+      'Unit: conditional pipeline branches based on context value',
+      'Unit: loop pipeline respects max_iterations and terminates',
+      'Unit: pipeline timeout returns TimeoutError when a step exceeds the limit'
+    ]
+  },
+  'REQ-7.2': {
+    acceptance: [
+      'Task struct accepts agent assignment, input/output types, description, and expected output',
+      'Timeout and retry configuration can be set per task',
+      'Expected output description is used for result validation'
+    ],
+    tests: [
+      'Unit: Task::builder().agent(agent).description("summarize").build() compiles',
+      'Unit: task with 5s timeout returns TimeoutError when execution exceeds limit',
+      'Unit: task with retry(3) retries up to 3 times on failure',
+      'Unit: expected_output description is accessible for validation logic'
+    ]
+  },
+  'REQ-4.3': {
+    acceptance: [
+      'Token counting is accurate per message within +-2 tokens',
+      'Truncation strategies work: truncate oldest, summarize older context, sliding window',
+      'Warning is logged/emitted when conversation exceeds 80% of context window'
+    ],
+    tests: [
+      'Unit: token count for "Hello world" matches provider tokenizer output',
+      'Unit: truncate_oldest strategy drops the oldest messages until under limit',
+      'Unit: summarize strategy replaces older messages with a summary',
+      'Unit: sliding_window keeps only the last N tokens',
+      'Integration: warning event fires when context usage crosses 80% threshold'
+    ]
+  },
+  'REQ-10.4': {
+    acceptance: [
+      'Token usage (prompt + completion) is accumulated per LLM call',
+      'Cost is calculated from a model pricing table with per-1K-token rates',
+      'Costs are queryable by scope: per request, per agent, per workflow, global'
+    ],
+    tests: [
+      'Unit: single request records prompt_tokens and completion_tokens',
+      'Unit: cost calculation for gpt-4 at 100 prompt + 50 completion tokens matches expected $',
+      'Unit: query by agent_id returns total cost for that agent across all calls',
+      'Unit: query by workflow_id returns total cost for that workflow run',
+      'Unit: global query returns sum of all tracked costs'
+    ]
+  },
+  'REQ-12.1': {
+    acceptance: [
+      'In-memory LRU cache is the default cache backend',
+      'Cache key is a deterministic hash of (prompt, model, config)',
+      'TTL and max size are configurable'
+    ],
+    tests: [
+      'Unit: identical request within TTL returns cached response without calling provider',
+      'Unit: different prompt produces a cache miss and calls the provider',
+      'Unit: expired TTL entry is treated as a miss',
+      'Unit: when max size is reached, least-recently-used entry is evicted',
+      'Integration: 1000 unique requests fill cache, then oldest entries are evicted'
+    ]
+  },
+  'REQ-3.3': {
+    acceptance: [
+      'Built-in tools: FileRead, FileWrite, HttpFetch, WebSearch, ShellExec are provided',
+      'Each tool has a valid JSON Schema, error handling, and sandboxed defaults',
+      'Tools are opt-in — none are enabled by default'
+    ],
+    tests: [
+      'Unit: FileRead reads a local text file and returns its contents',
+      'Unit: FileWrite writes content to a file within the allowed directory',
+      'Unit: HttpFetch makes a GET request and returns the response body',
+      'Unit: ShellExec runs a command and captures stdout/stderr',
+      'Unit: no built-in tools are registered unless explicitly enabled by user'
+    ]
+  },
+  'REQ-2.4': {
+    acceptance: [
+      'Short-term memory stores recent N messages or a token-window of context',
+      'Long-term memory stores key-value or vector-backed knowledge',
+      'Agents automatically reference their own memory without manual injection'
+    ],
+    tests: [
+      'Unit: short-term memory stores and retrieves recent messages in LIFO/FIFO order',
+      'Unit: long-term memory stores a key-value pair and retrieves by key',
+      'Unit: agent execution automatically includes relevant memory in the prompt',
+      'Integration: agent recalls information from a previous interaction via long-term memory'
+    ]
+  },
+  'REQ-2.3': {
+    acceptance: [
+      'Manager agent can delegate tasks to a pool of worker agents',
+      'delegate(task, agent) is available as a built-in tool within agent context',
+      'Results from delegated tasks are aggregated and returned to the delegating agent'
+    ],
+    tests: [
+      'Unit: manager delegates a task to worker and receives the result',
+      'Unit: delegate tool appears in agent tool list when delegation is enabled',
+      'Unit: multiple delegations produce an aggregated result list',
+      'Integration: hierarchical delegation (manager -> sub-manager -> worker) completes successfully'
+    ]
+  },
+  'REQ-1.3': {
+    acceptance: [
+      'Static registry includes known models with metadata: context window, capabilities, cost',
+      'Dynamic registration allows adding custom or local models at runtime',
+      'Query by capability: supports_vision, max_context(200k), etc.'
+    ],
+    tests: [
+      'Unit: registry contains entries for GPT-4, Claude, Gemini with correct metadata',
+      'Unit: register custom model "my-model" and retrieve it by name',
+      'Unit: query(supports_vision=true) returns only vision-capable models',
+      'Unit: query(max_context >= 200000) returns models with 200k+ context windows'
+    ]
+  },
+  'REQ-7.3': {
+    acceptance: [
+      'DAG builder: task.depends_on(other_task) creates a dependency edge',
+      'Topological sort determines correct execution order',
+      'Circular dependencies are detected and rejected with a clear error'
+    ],
+    tests: [
+      'Unit: A->B->C executes in order A, B, C',
+      'Unit: A depends on B and C; B and C run in parallel before A runs',
+      'Unit: circular dependency A->B->A returns CyclicDependencyError',
+      'Unit: independent tasks with no dependencies all run in parallel',
+      'Integration: complex DAG with 10 tasks resolves to correct parallel execution plan'
+    ]
+  },
+  'REQ-7.4': {
+    acceptance: [
+      'Per-task error policy: retry(n, backoff), fallback(agent/model), skip, halt',
+      'Global default policy with per-task override capability',
+      'Error context propagates to downstream tasks'
+    ],
+    tests: [
+      'Unit: retry policy retries 3 times with exponential backoff on transient error',
+      'Unit: fallback policy switches to backup agent on primary failure',
+      'Unit: skip policy logs the error and continues pipeline execution',
+      'Unit: halt policy stops the pipeline and returns the error',
+      'Unit: downstream task receives error context from failed upstream task'
+    ]
+  },
+  'REQ-9.3': {
+    acceptance: [
+      'Guardrail trait defines check(input) -> Result<(), Rejection>',
+      'Multiple guardrails can be chained for input and output independently',
+      'Built-in guardrails: regex PII detector, length limiter',
+      'Custom guardrails via user-defined validation functions'
+    ],
+    tests: [
+      'Unit: PII guardrail rejects input containing SSN pattern',
+      'Unit: length guardrail rejects input exceeding max length',
+      'Unit: custom guardrail with user-defined fn accepts/rejects correctly',
+      'Unit: chained guardrails reject on first failure and report which guardrail failed',
+      'Integration: input chain runs before LLM call, output chain runs after'
+    ]
+  },
+  'REQ-11.2': {
+    acceptance: [
+      'Span created per: LLM call, tool execution, pipeline step, agent turn',
+      'Spans have hierarchical parent-child relationships',
+      'Export to OpenTelemetry format or JSON'
+    ],
+    tests: [
+      'Unit: LLM call creates a span with name, start_time, end_time, and status',
+      'Unit: pipeline step span has parent reference to pipeline span',
+      'Unit: agent turn span is parent of its LLM call and tool execution spans',
+      'Unit: JSON export produces valid, parseable trace data',
+      'Integration: full pipeline execution produces a complete trace tree'
+    ]
+  },
+  'REQ-14.1': {
+    acceptance: [
+      'Semaphore-based concurrency limits are configurable',
+      'Parallel tasks within pipelines respect the concurrency limit',
+      'Shared state is thread-safe under concurrent access'
+    ],
+    tests: [
+      'Unit: concurrency limit of 3 allows max 3 tasks to run simultaneously',
+      'Unit: 4th task waits until one of the first 3 completes',
+      'Unit: shared counter incremented by 100 concurrent tasks reads exactly 100',
+      'Integration: pipeline with 10 parallel tasks respects semaphore limit of 4'
+    ]
+  },
+  'REQ-13.1': {
+    acceptance: [
+      'Input scanning detects common prompt injection patterns (ignore instructions, role override, etc.)',
+      'System prompt is isolated from user input — user content cannot override system instructions',
+      'Output monitoring detects potential leaked instructions'
+    ],
+    tests: [
+      'Unit: "ignore previous instructions" pattern is flagged as potential injection',
+      'Unit: "you are now a different assistant" pattern is flagged',
+      'Unit: system prompt content is not modifiable via user message',
+      'Unit: output containing system prompt text triggers a monitoring alert',
+      'Integration: end-to-end injection attempt is blocked and logged'
+    ]
+  },
+  'REQ-15.4': {
+    acceptance: [
+      'Plugin trait defines lifecycle hooks: on_load(), on_request(), on_response()',
+      'Plugins can be dynamically registered at startup',
+      'Plugin discovery scans configured directories for plugin files'
+    ],
+    tests: [
+      'Unit: on_load() is called once when plugin is registered',
+      'Unit: on_request() is called before each LLM request and can modify the request',
+      'Unit: on_response() is called after each LLM response and can modify the response',
+      'Unit: plugin loaded from configured directory via discovery mechanism',
+      'Integration: custom logging plugin intercepts and records all requests/responses'
+    ]
+  },
+  'REQ-16.1': {
+    acceptance: [
+      'REST endpoints: POST /agents/{id}/run, POST /pipelines/{id}/execute',
+      'Request/response with typed JSON bodies',
+      'API key authentication and per-key rate limiting'
+    ],
+    tests: [
+      'Unit: POST /agents/{id}/run with valid body returns 200 with agent output',
+      'Unit: POST /agents/{id}/run without API key returns 401',
+      'Unit: requests exceeding rate limit return 429',
+      'Unit: POST /pipelines/{id}/execute returns 200 with pipeline result',
+      'Integration: full request lifecycle — auth -> rate limit -> execute -> response'
+    ]
+  },
+  'REQ-8.1': {
+    acceptance: [
+      'Image message type in provider-agnostic format',
+      'Base64 and URL image inputs are supported',
+      'Multi-image comparison works with 2+ images in a single request'
+    ],
+    tests: [
+      'Unit: base64-encoded PNG is accepted as image input',
+      'Unit: image URL is accepted and fetched by the provider',
+      'Unit: request with 2 images produces a valid multi-image prompt',
+      'Integration: "describe the difference between these images" returns a comparative analysis'
+    ]
+  },
+  'REQ-5.2': {
+    acceptance: [
+      'LongTermMemory trait defines store(), search(), delete() methods',
+      'Vector store backends: Qdrant, pgvector, in-memory HNSW',
+      'Embedding-based semantic search with configurable similarity threshold'
+    ],
+    tests: [
+      'Unit: store() persists a document and returns a unique ID',
+      'Unit: search() with high-similarity query returns the stored document',
+      'Unit: delete() removes the document and it no longer appears in search results',
+      'Unit: similarity threshold of 0.8 filters out low-relevance results',
+      'Integration: switch from in-memory to Qdrant backend without code changes to search logic'
+    ]
+  },
+  'REQ-6.1': {
+    acceptance: [
+      'Parsers for PDF, HTML, Markdown, plain text, and DOCX formats',
+      'Parsed content is chunked according to configured strategy',
+      'Embeddings are automatically generated and indexed for each chunk'
+    ],
+    tests: [
+      'Unit: PDF parser extracts readable text from a sample PDF',
+      'Unit: HTML parser strips tags and returns clean text content',
+      'Unit: Markdown parser preserves heading structure as metadata',
+      'Unit: ingestion pipeline produces chunks with embeddings in the vector store',
+      'Integration: ingest a 50-page PDF and retrieve relevant chunks by semantic query'
+    ]
+  },
+  'REQ-6.5': {
+    acceptance: [
+      'Chunker trait with configurable strategies: fixed-size, sentence, paragraph, semantic, recursive',
+      'Configurable chunk size (tokens) and overlap between chunks',
+      'Metadata preservation: page number, section header, source document'
+    ],
+    tests: [
+      'Unit: fixed-size chunker produces chunks of approximately N tokens',
+      'Unit: sentence chunker splits on sentence boundaries',
+      'Unit: paragraph chunker splits on double newlines',
+      'Unit: overlap of 50 tokens means last 50 tokens of chunk N appear at start of chunk N+1',
+      'Unit: each chunk carries metadata with page number and section header'
+    ]
+  },
+  'REQ-6.2': {
+    acceptance: [
+      'VectorStore trait defines upsert(), query(), delete() methods',
+      'Implementations for Pinecone, Weaviate, Chroma, Qdrant, pgvector',
+      'Connection pooling and health checks for remote stores'
+    ],
+    tests: [
+      'Unit: upsert() stores a vector and returns its ID',
+      'Unit: query() returns nearest neighbors sorted by similarity',
+      'Unit: delete() removes a vector by ID',
+      'Unit: connection pool reuses connections across multiple queries',
+      'Integration: health check detects when remote store is unreachable'
+    ]
+  },
+  'REQ-6.3': {
+    acceptance: [
+      'Retriever trait with pluggable strategies',
+      'Semantic search using embedding similarity',
+      'BM25 keyword-based sparse retrieval',
+      'Hybrid search combining semantic + keyword scores',
+      'Re-ranking via cross-encoder or LLM-based reranking'
+    ],
+    tests: [
+      'Unit: semantic retriever returns results sorted by embedding cosine similarity',
+      'Unit: BM25 retriever returns results matching keyword terms with TF-IDF scoring',
+      'Unit: hybrid retriever combines and normalizes semantic + BM25 scores',
+      'Unit: reranker reorders top-K results with a cross-encoder model',
+      'Integration: full retrieval pipeline: query -> hybrid search -> rerank -> top 5'
+    ]
+  },
+  'REQ-6.4': {
+    acceptance: [
+      'Template placeholder {{#context}}...{{/context}} for retrieved context injection',
+      'Source citations: [1], [2] linked to original document references',
+      'Duplicate or near-duplicate chunks are deduplicated before injection'
+    ],
+    tests: [
+      'Unit: context block is populated with retrieved chunks when provided',
+      'Unit: each chunk in context is annotated with a numbered citation [N]',
+      'Unit: citation numbers map back to source document metadata',
+      'Unit: two chunks with >95% similarity are deduplicated to one',
+      'Integration: RAG query returns response with verifiable source citations'
+    ]
+  },
+  'REQ-3.4': {
+    acceptance: [
+      'Tool inputs are validated against their JSON Schema before execution',
+      'Validation errors include the path to the invalid field and a descriptive message',
+      'Compatible types are coerced (e.g., string "5" to integer 5)'
+    ],
+    tests: [
+      'Unit: valid input passes validation and execution proceeds',
+      'Unit: missing required field returns error with field path "properties.name"',
+      'Unit: string "5" for integer field is coerced to 5 and accepted',
+      'Unit: invalid type (object for string field) returns descriptive type error'
+    ]
+  },
+  'REQ-9.2': {
+    acceptance: [
+      'JSON is extracted from markdown code blocks (```json...```)',
+      'Common issues are auto-fixed: trailing commas, unquoted keys',
+      'Retry with error feedback on parse failure'
+    ],
+    tests: [
+      'Unit: extract JSON from ```json\\n{"key": "value"}\\n```',
+      'Unit: extract JSON when wrapped in prose text',
+      'Unit: fix trailing comma: {"a": 1,} -> {"a": 1}',
+      'Unit: fix unquoted key: {name: "test"} -> {"name": "test"}',
+      'Integration: malformed response triggers retry with "fix the JSON" feedback'
+    ]
+  },
+  'REQ-9.4': {
+    acceptance: [
+      'Format specifications on task/agent definitions: plain text, Markdown, code blocks, tables, custom',
+      'Post-processing pipeline for output transformation',
+      'Template-based formatting with configurable templates'
+    ],
+    tests: [
+      'Unit: format=Markdown produces properly formatted markdown output',
+      'Unit: format=code_block wraps output in ``` ```',
+      'Unit: format=table produces a markdown table from structured data',
+      'Unit: custom template applies user-defined formatting pattern'
+    ]
+  },
+  'REQ-12.4': {
+    acceptance: [
+      'Token bucket rate limiting algorithm',
+      'Queued requests when rate limit is reached',
+      'Configurable RPM/TPM limits per provider, model, and agent'
+    ],
+    tests: [
+      'Unit: RPM limit of 10 allows exactly 10 requests in one minute',
+      'Unit: 11th request is queued and executes after the window resets',
+      'Unit: TPM limit of 100K rejects requests that would exceed the token budget',
+      'Unit: different agents can have independent rate limits',
+      'Integration: concurrent requests respect both RPM and TPM limits'
+    ]
+  },
+  'REQ-4.4': {
+    acceptance: [
+      'SystemPrompt builder with .persona(), .instructions(), .tools(), .guardrails() methods',
+      'Automatic ordering and deduplication of prompt sections',
+      'Sections can be individually enabled or disabled'
+    ],
+    tests: [
+      'Unit: builder produces a system prompt containing persona, instructions, tools, and guardrails',
+      'Unit: duplicate instructions are merged into one section',
+      'Unit: disabling guardrails section omits it from the final prompt',
+      'Unit: section ordering follows the documented priority order'
+    ]
+  },
+  'REQ-5.4': {
+    acceptance: [
+      'Scope hierarchy: global > user > session > agent',
+      'Read/write permissions configurable per scope level',
+      'Configurable isolation between scopes'
+    ],
+    tests: [
+      'Unit: write to agent scope does not affect user scope',
+      'Unit: read from agent scope falls back to session, then user, then global',
+      'Unit: isolated agent scope cannot read from another agent scope',
+      'Unit: global scope is readable from all levels'
+    ]
+  },
+  'REQ-5.5': {
+    acceptance: [
+      'TTL per memory entry — entries expire after the configured duration',
+      'LRU eviction when capacity is reached',
+      'Relevance scoring for eviction priority'
+    ],
+    tests: [
+      'Unit: entry with 1-hour TTL expires after 1 hour and returns None on get()',
+      'Unit: when capacity of 100 is reached, least-recently-used entry is evicted on next add()',
+      'Unit: low-relevance entries are evicted before high-relevance entries',
+      'Integration: mixed TTL and LRU eviction respects both policies'
+    ]
+  },
+  'REQ-7.5': {
+    acceptance: [
+      'HumanApproval step type in pipelines',
+      'Configurable timeout with auto-reject or auto-approve action',
+      'Callback interface for UI integration'
+    ],
+    tests: [
+      'Unit: HumanApproval step pauses pipeline until approval is received',
+      'Unit: approval callback resumes pipeline execution',
+      'Unit: rejection callback stops pipeline with rejection reason',
+      'Unit: timeout of 5 minutes with auto-reject policy rejects after 5 min',
+      'Integration: UI callback receives approval request and returns decision'
+    ]
+  },
+  'REQ-12.3': {
+    acceptance: [
+      'Provider-side prompt caching support is detected automatically',
+      'Cacheable prompt prefixes are marked with provider-specific markers',
+      'Cache hit/miss status is reported in response metadata'
+    ],
+    tests: [
+      'Unit: Anthropic provider detects prompt caching capability',
+      'Unit: cacheable prefix marker is added to system prompt for Anthropic',
+      'Unit: response metadata includes cache_creation_input_tokens and cache_read_input_tokens',
+      'Integration: repeated requests with same prefix show cache_read hits'
+    ]
+  },
+  'REQ-15.5': {
+    acceptance: [
+      'File watcher monitors config and prompt directories for changes',
+      'Atomic swap of updated definitions — no partial states',
+      'In-flight requests complete with the old configuration'
+    ],
+    tests: [
+      'Unit: modify config YAML and verify new value is loaded within 2 seconds',
+      'Unit: modify prompt template and verify new template is used for next request',
+      'Unit: in-flight request uses old config while new request uses updated config',
+      'Edge: invalid config file does not replace the current valid config'
+    ]
+  },
+  'REQ-15.6': {
+    acceptance: [
+      'Generic Agent<I, O> with typed input and output',
+      'Generic Tool<I, O> with typed execute',
+      'Compile-time verification of pipeline type flow'
+    ],
+    tests: [
+      'Unit: Agent<String, MyOutput> compiles and produces MyOutput from String input',
+      'Unit: Tool<MyInput, MyOutput> compiles with typed execute(MyInput) -> MyOutput',
+      'Unit: pipeline step A<String, MyStruct> -> B<MyStruct, String> compiles',
+      'Unit: pipeline step A<String, MyStruct> -> B<OtherStruct, String> fails to compile'
+    ]
+  },
+  'REQ-3.2': {
+    acceptance: [
+      'ToolRegistry with register(), get(), list() methods',
+      'Query by name, tag, or capability',
+      'Runtime registration from plugins'
+    ],
+    tests: [
+      'Unit: register a tool and retrieve it by exact name',
+      'Unit: list() returns all registered tools',
+      'Unit: query by tag "search" returns all tools with that tag',
+      'Unit: plugin registers a tool at runtime and it appears in list()',
+      'Unit: registering duplicate name returns an error'
+    ]
+  },
+  'REQ-3.5': {
+    acceptance: [
+      'Tool piping: tool_a.pipe(tool_b) chains output of A to input of B',
+      'Type-checked composition at compile time — mismatched types fail to compile',
+      'Intermediate results are inspectable for debugging'
+    ],
+    tests: [
+      'Unit: pipe(tool_a, tool_b) passes output of A as input to B',
+      'Unit: pipe where A output type != B input type fails to compile',
+      'Unit: intermediate result is captured and available for inspection',
+      'Integration: chain of 3 tools produces correct final output'
+    ]
+  },
+  'REQ-4.2': {
+    acceptance: [
+      'PromptRegistry with register(), get(version), activate() methods',
+      'Version history with diff view capability',
+      'A/B assignment by hash of (user, prompt_id)'
+    ],
+    tests: [
+      'Unit: register prompt v1, then v2 — get(2) returns v2 content',
+      'Unit: activate(v2) makes v2 the default for get() without version',
+      'Unit: diff(v1, v2) returns a human-readable diff',
+      'Unit: same user always gets the same variant for a given prompt_id',
+      'Integration: traffic split 50/50 across two prompt variants'
+    ]
+  },
+  'REQ-2.2': {
+    acceptance: [
+      'State machine: Created -> Running -> Paused -> Running -> Stopped',
+      'Agent state can be persisted for later resume',
+      'Graceful shutdown completes in-flight requests before stopping'
+    ],
+    tests: [
+      'Unit: state transitions follow the defined state machine order',
+      'Unit: invalid transition (Stopped -> Running) returns an error',
+      'Unit: pause() saves state and resume() restores it',
+      'Unit: shutdown() waits for in-flight request to complete before returning',
+      'Integration: pause during execution, resume from persisted state, complete task'
+    ]
+  },
+  'REQ-2.5': {
+    acceptance: [
+      'Plan struct with list of steps and dependencies',
+      'LLM-assisted plan generation from a natural language goal',
+      'Re-planning on step failure — generate alternative approach'
+    ],
+    tests: [
+      'Unit: Plan with 3 steps and dependencies resolves to correct execution order',
+      'Unit: generate_plan("research AI frameworks") produces a multi-step plan',
+      'Unit: step failure triggers re-plan with adjusted steps',
+      'Integration: complex goal -> plan -> execute -> partial failure -> replan -> complete'
+    ]
+  },
+  'REQ-2.6': {
+    acceptance: [
+      'MessageBus with send(), broadcast(), subscribe() methods',
+      'Typed message envelopes with serialization',
+      'Async message delivery to subscribers'
+    ],
+    tests: [
+      'Unit: send(agent_b, message) delivers message to agent_b only',
+      'Unit: broadcast(message) delivers to all subscribers',
+      'Unit: subscribe(topic) receives only messages for that topic',
+      'Unit: typed message envelope deserializes to the correct struct',
+      'Integration: three agents communicate via pub/sub to coordinate a task'
+    ]
+  },
+  'REQ-7.6': {
+    acceptance: [
+      'task.spawn() returns a JoinHandle for async execution',
+      'Callbacks: on_success(), on_failure() for completion handling',
+      'Event stream for pipeline progress tracking'
+    ],
+    tests: [
+      'Unit: spawn() returns immediately and JoinHandle resolves when task completes',
+      'Unit: on_success() callback fires with the task result',
+      'Unit: on_failure() callback fires with the error on task failure',
+      'Unit: event stream emits progress events for each pipeline step',
+      'Integration: spawned task completes, callback fires, result collected'
+    ]
+  },
+  'REQ-8.5': {
+    acceptance: [
+      'Parse CSV, JSON, and tabular data as structured input',
+      'Schema inference from data samples',
+      'Format conversion between structured types (CSV -> JSON, JSON -> table)'
+    ],
+    tests: [
+      'Unit: parse CSV with headers into a list of records',
+      'Unit: parse JSON array into typed structs',
+      'Unit: schema inference produces correct field types from sample data',
+      'Unit: convert CSV to JSON maintains data integrity',
+      'Integration: ingest CSV -> infer schema -> convert to JSON -> pass to agent'
+    ]
+  },
+  'REQ-8.2': {
+    acceptance: [
+      'ImageGenerator trait with generate(), edit(), vary() methods',
+      'Provider implementations for DALL-E and Stability AI',
+      'Generated images are consumable as image messages by agents'
+    ],
+    tests: [
+      'Unit: generate("a cat") returns an image URL or base64 data',
+      'Unit: edit(image, "make it blue") returns a modified image',
+      'Unit: vary(image) returns a variation of the input image',
+      'Unit: generated image can be passed as an image message to an agent',
+      'Integration: agent generates an image and then describes it'
+    ]
+  },
+  'REQ-8.3': {
+    acceptance: [
+      'Transcriber trait: transcribe(audio) -> text',
+      'Synthesizer trait: synthesize(text) -> audio',
+      'Provider implementations for Whisper, ElevenLabs, Google TTS'
+    ],
+    tests: [
+      'Unit: transcribe(wav_data) returns transcribed text',
+      'Unit: synthesize("Hello world") returns audio bytes',
+      'Unit: different voice options produce different audio outputs',
+      'Integration: transcribe user audio -> agent processes text -> synthesize response'
+    ]
+  },
+  'REQ-10.1': {
+    acceptance: [
+      'Run evaluation dataset against configured agents',
+      'Report accuracy, latency, and cost metrics per run',
+      'Compare results across multiple runs'
+    ],
+    tests: [
+      'Unit: evaluation with 10 samples produces 10 scored results',
+      'Unit: accuracy metric is calculated as correct/total',
+      'Unit: latency metric reports p50, p95, p99',
+      'Unit: compare(run_a, run_b) shows delta for each metric',
+      'Integration: full benchmark run against a test agent with results report'
+    ]
+  },
+  'REQ-10.2': {
+    acceptance: [
+      'Variant assignment and traffic splitting (e.g., 50/50)',
+      'Metric collection per variant',
+      'Statistical significance calculator'
+    ],
+    tests: [
+      'Unit: traffic split of 50/50 distributes requests approximately evenly over 1000 runs',
+      'Unit: each variant collects its own metrics independently',
+      'Unit: significance calculator returns p-value for two-variant comparison',
+      'Unit: early stopping when significance threshold is reached',
+      'Integration: A/B test with 2 prompt variants, collect metrics, determine winner'
+    ]
+  },
+  'REQ-10.3': {
+    acceptance: [
+      'Golden dataset with expected outputs for regression testing',
+      'Semantic similarity scoring to detect output drift',
+      'CI integration with configurable pass/fail thresholds'
+    ],
+    tests: [
+      'Unit: golden test passes when output matches expected within similarity threshold',
+      'Unit: golden test fails when output drifts below threshold',
+      'Unit: similarity score of 0.95 is calculated correctly between two texts',
+      'Integration: CI pipeline runs regression tests and reports pass/fail'
+    ]
+  },
+  'REQ-10.5': {
+    acceptance: [
+      'Scorer trait: score(input, output, context) -> f64',
+      'Built-in scorers: relevance, faithfulness, length',
+      'LLM-as-judge scorer implementation'
+    ],
+    tests: [
+      'Unit: relevance scorer returns 1.0 for perfectly relevant output',
+      'Unit: faithfulness scorer penalizes hallucinated content not in context',
+      'Unit: length scorer returns score based on output length constraints',
+      'Unit: LLM-as-judge scorer uses a separate LLM call to evaluate quality',
+      'Integration: multi-scorer evaluation combines relevance + faithfulness scores'
+    ]
+  },
+  'REQ-11.3': {
+    acceptance: [
+      'Prometheus-compatible /metrics endpoint',
+      'Histograms for latency, counters for tokens and errors',
+      'Dimensions: per-provider, per-model, per-agent'
+    ],
+    tests: [
+      'Unit: /metrics endpoint returns Prometheus-format text',
+      'Unit: latency histogram records p50, p95, p99 values',
+      'Unit: token counter increments by correct amount per request',
+      'Unit: error counter increments on failed requests',
+      'Unit: metrics are tagged with provider, model, and agent dimensions'
+    ]
+  },
+  'REQ-11.4': {
+    acceptance: [
+      'Step-through agent execution with configurable breakpoints',
+      'Prompt preview before sending to LLM',
+      'Context window visualization showing token budget usage'
+    ],
+    tests: [
+      'Unit: breakpoint at tool call pauses execution',
+      'Unit: resume continues from breakpoint',
+      'Unit: prompt preview shows the fully assembled prompt string',
+      'Unit: context visualization shows token count per message section',
+      'Integration: debug session steps through full agent execution'
+    ]
+  },
+  'REQ-13.2': {
+    acceptance: [
+      'Category-based filters: violence, hate, sexual, self-harm',
+      'Configurable severity thresholds per category: block, warn, allow',
+      'Custom filter rules via regex or ML classifier'
+    ],
+    tests: [
+      'Unit: violence category filter blocks violent content at block threshold',
+      'Unit: hate category filter warns but allows at warn threshold',
+      'Unit: custom regex filter matches and blocks configured patterns',
+      'Unit: each category threshold is independently configurable',
+      'Integration: multi-category filter processes input through all categories'
+    ]
+  },
+  'REQ-13.3': {
+    acceptance: [
+      'Pattern-based detection: SSN, email, phone, credit card numbers',
+      'Configurable actions: redact, hash, warn, block',
+      'Custom entity patterns with regex'
+    ],
+    tests: [
+      'Unit: SSN pattern 123-45-6789 is detected in input text',
+      'Unit: email user@example.com is detected and redacted to [EMAIL]',
+      'Unit: phone number is detected and hashed according to policy',
+      'Unit: custom pattern matches organization-specific ID formats',
+      'Integration: document with mixed PII types is fully processed per policy'
+    ]
+  },
+  'REQ-14.2': {
+    acceptance: [
+      'All state (memory, config) is externalized to shared stores',
+      'Task queue integration with Redis and RabbitMQ',
+      'Worker registration and health monitoring'
+    ],
+    tests: [
+      'Unit: worker registers with the coordinator and appears in active worker list',
+      'Unit: task is enqueued to Redis and dequeued by a worker',
+      'Unit: state stored in external store survives worker restart',
+      'Unit: unhealthy worker is detected and tasks are reassigned',
+      'Integration: 3 workers process 10 tasks from a shared queue'
+    ]
+  },
+  'REQ-15.2': {
+    acceptance: [
+      'ai-frame new <project> scaffolds a new project with directory structure',
+      'ai-frame run <agent> runs a defined agent',
+      'ai-frame test <suite> runs evaluation test suites',
+      'ai-frame deploy deploys the API server'
+    ],
+    tests: [
+      'Unit: new command creates directories: src/, config/, prompts/, tests/',
+      'Unit: run command loads agent config and executes with stdin input',
+      'Unit: test command runs evaluation suite and prints results',
+      'Unit: deploy command starts API server on configured port',
+      'Integration: full workflow: new -> configure -> run -> test -> deploy'
+    ]
+  },
+  'REQ-16.2': {
+    acceptance: [
+      'Multi-stage Dockerfile (build + runtime) produces minimal image',
+      'docker-compose with API server and dependencies (Redis, Postgres)',
+      'Configuration via environment variables'
+    ],
+    tests: [
+      'Unit: docker build succeeds and produces an image under 200MB',
+      'Unit: docker-compose up starts all services and health checks pass',
+      'Unit: environment variable overrides are applied at container startup',
+      'Integration: full stack starts, API responds to health check, agent runs successfully'
+    ]
+  },
+  'REQ-17.1': {
+    acceptance: [
+      'DataSource trait defines read() and write() methods',
+      'SQL backends: PostgreSQL, MySQL, SQLite',
+      'NoSQL backends: MongoDB, Redis',
+      'File backends: local filesystem, S3, GCS'
+    ],
+    tests: [
+      'Unit: PostgreSQL DataSource reads rows from a table',
+      'Unit: PostgreSQL DataSource writes rows to a table',
+      'Unit: S3 DataSource reads a file from a bucket',
+      'Unit: MongoDB DataSource queries documents from a collection',
+      'Integration: agent reads from SQL, processes, writes to S3'
+    ]
+  },
+  'REQ-17.2': {
+    acceptance: [
+      'Channel trait defines send() and receive() methods',
+      'Connectors for Slack, Discord, Email (SMTP/IMAP), and Twilio SMS',
+      'Message normalization across platforms'
+    ],
+    tests: [
+      'Unit: Slack connector sends a message to a channel',
+      'Unit: Discord connector receives a message from a channel',
+      'Unit: Email connector sends via SMTP and receives via IMAP',
+      'Unit: message from Slack normalizes to a common Message struct',
+      'Integration: agent receives message from Discord, processes, responds via Slack'
+    ]
+  },
+  'REQ-17.3': {
+    acceptance: [
+      'MCP client discovers and calls external tools via MCP protocol',
+      'MCP server exposes framework tools to external consumers',
+      'Transport layers: stdio and HTTP/SSE'
+    ],
+    tests: [
+      'Unit: MCP client connects to server and lists available tools',
+      'Unit: MCP client calls an external tool and receives the result',
+      'Unit: MCP server exposes a framework tool and it appears in tool list',
+      'Unit: stdio transport sends and receives JSON-RPC messages',
+      'Integration: external MCP tool is used by an agent in a pipeline'
+    ]
+  },
+  'REQ-18.1': {
+    acceptance: [
+      'Router trait: route(prompt, context) -> model selection',
+      'Rule-based routing by keyword, prompt length, or task type',
+      'LLM-based complexity classifier for intelligent routing'
+    ],
+    tests: [
+      'Unit: keyword rule routes "translate" queries to a fast model',
+      'Unit: length rule routes prompts > 500 tokens to a high-context model',
+      'Unit: task type rule routes "code" queries to a code-specialized model',
+      'Unit: complexity classifier correctly categorizes simple vs complex prompts',
+      'Integration: mixed workload is automatically routed to appropriate models'
+    ]
+  },
+  'REQ-18.2': {
+    acceptance: [
+      'Prompt compression removes redundancy and shortens instructions',
+      'Context pruning drops low-relevance history entries',
+      'Max token enforcement on responses'
+    ],
+    tests: [
+      'Unit: compressed prompt is shorter while preserving semantic meaning',
+      'Unit: pruned history retains high-relevance entries and drops low ones',
+      'Unit: response exceeding max_tokens is truncated with a note',
+      'Integration: token-optimized pipeline uses fewer tokens than unoptimized'
+    ]
+  },
+  'REQ-1.5': {
+    acceptance: [
+      'Embedder trait: embed(text) -> Vec<f32>',
+      'Provider implementations: OpenAI, Cohere, local ONNX',
+      'Batch embedding with rate limiting'
+    ],
+    tests: [
+      'Unit: embed("hello world") returns a vector of expected dimensionality',
+      'Unit: similar texts produce embeddings with high cosine similarity',
+      'Unit: batch embed of 100 texts returns 100 vectors',
+      'Unit: rate limiter delays requests when provider limit is approached',
+      'Integration: embed documents -> store in vector DB -> query by similarity'
+    ]
+  },
+  'REQ-3.6': {
+    acceptance: [
+      'Sandbox backends: Docker, WASM, native (seccomp)',
+      'Permission model: filesystem access, network access, compute limits',
+      'Timeout and memory limits per tool execution'
+    ],
+    tests: [
+      'Unit: Docker sandbox executes tool in isolated container',
+      'Unit: WASM sandbox executes compiled WASM tool binary',
+      'Unit: filesystem write outside allowed directory is denied',
+      'Unit: tool execution exceeding memory limit is killed',
+      'Unit: tool execution exceeding timeout is terminated'
+    ]
+  },
+  'REQ-5.3': {
+    acceptance: [
+      'KnowledgeBase builder: .add_document(), .build(), .query()',
+      'Automatic ingestion pipeline: parse -> chunk -> embed -> index',
+      'Incremental updates: add/remove documents without rebuilding index'
+    ],
+    tests: [
+      'Unit: add_document(path) parses and indexes the document',
+      'Unit: query("topic") returns relevant chunks from indexed documents',
+      'Unit: add second document and query returns results from both',
+      'Unit: remove document and its chunks no longer appear in results',
+      'Integration: build KB from 10 documents, query, add 5 more, query again'
+    ]
+  },
+  'REQ-8.4': {
+    acceptance: [
+      'Frame extraction at configurable intervals (e.g., 1 frame/sec)',
+      'Multi-frame analysis with temporal context between frames',
+      'Scene boundary detection identifies transitions'
+    ],
+    tests: [
+      'Unit: extract frames from a 10-second video at 1fps -> 10 frames',
+      'Unit: multi-frame analysis describes what happens over time',
+      'Unit: scene boundary detection identifies hard cuts',
+      'Integration: full video analysis produces timestamped scene descriptions'
+    ]
+  },
+  'REQ-11.5': {
+    acceptance: [
+      'OpenTelemetry exporter for traces and metrics',
+      'LangSmith integration for prompt and trace tracking',
+      'Pluggable exporter interface for custom backends'
+    ],
+    tests: [
+      'Unit: OTel exporter produces valid OTLP trace data',
+      'Unit: OTel exporter produces valid OTLP metric data',
+      'Unit: LangSmith integration sends traces with correct project tags',
+      'Unit: custom exporter receives trace data through the plugin interface',
+      'Integration: full pipeline execution visible in LangSmith dashboard'
+    ]
+  },
+  'REQ-12.2': {
+    acceptance: [
+      'Incoming query is embedded and compared against cached query embeddings',
+      'Configurable similarity threshold for cache hits',
+      'Cache eviction by recency and hit frequency'
+    ],
+    tests: [
+      'Unit: semantically identical query returns cached response',
+      'Unit: "what is machine learning?" and "explain ML" are considered similar enough for cache hit',
+      'Unit: similarity threshold of 0.95 is more restrictive than 0.80',
+      'Unit: low-hit-frequency entries are evicted before high-hit entries',
+      'Integration: 100 unique but clustered queries achieve >50% cache hit rate'
+    ]
+  },
+  'REQ-12.5': {
+    acceptance: [
+      'Per-provider connection pool with configurable max connections',
+      'Keep-alive and connection reuse for HTTP',
+      'Automatic reconnection on connection failure'
+    ],
+    tests: [
+      'Unit: pool with max 10 connections reuses connections across requests',
+      'Unit: 11th concurrent request waits for an available connection',
+      'Unit: dead connection is detected and replaced automatically',
+      'Unit: keep-alive prevents TCP handshake on subsequent requests',
+      'Integration: sustained load of 1000 requests uses pooled connections efficiently'
+    ]
+  },
+  'REQ-13.4': {
+    acceptance: [
+      'Role definitions: admin, developer, user, agent',
+      'Permission matrix: which roles can use which tools, models, data',
+      'Policy enforcement at agent and pipeline level'
+    ],
+    tests: [
+      'Unit: admin role can access all tools and models',
+      'Unit: user role cannot access admin-only tools',
+      'Unit: agent role is restricted to its assigned tools',
+      'Unit: unauthorized tool access returns PermissionDenied error',
+      'Integration: pipeline with mixed-role tasks enforces permissions per task'
+    ]
+  },
+  'REQ-13.5': {
+    acceptance: [
+      'Append-only audit log of every agent action, tool call, and data access',
+      'Structured format: timestamp, agent_id, action, input_hash, output_hash',
+      'Queryable with configurable retention policy'
+    ],
+    tests: [
+      'Unit: every LLM call generates an audit log entry',
+      'Unit: every tool execution generates an audit log entry',
+      'Unit: audit log entries contain all required fields',
+      'Unit: query by agent_id returns all entries for that agent',
+      'Unit: entries older than retention period are automatically cleaned up'
+    ]
+  },
+  'REQ-14.3': {
+    acceptance: [
+      'Resource pool with checkout/checkin for GPU memory, API quotas, DB connections',
+      'Quota tracking per provider with API limit awareness',
+      'Automatic cleanup of idle resources'
+    ],
+    tests: [
+      'Unit: checkout returns an available resource, checkin returns it to the pool',
+      'Unit: checkout blocks when pool is exhausted until a resource is checked in',
+      'Unit: quota tracker rejects requests when API quota is exceeded',
+      'Unit: idle resource cleanup runs after configurable timeout',
+      'Integration: pool manages 5 GPU slots across 20 concurrent requests'
+    ]
+  },
+  'REQ-14.4': {
+    acceptance: [
+      'Batch submission with automatic request grouping',
+      'Provider batch APIs used where available (e.g., OpenAI batch)',
+      'Progress tracking and partial failure handling'
+    ],
+    tests: [
+      'Unit: 50 requests are grouped into batches of 10',
+      'Unit: batch API returns results for all 10 items in the batch',
+      'Unit: partial failure reports which items succeeded and which failed',
+      'Unit: progress tracker shows 7/10 items completed',
+      'Integration: submit 100 requests as batch, track progress, handle partial failures'
+    ]
+  },
+  'REQ-16.3': {
+    acceptance: [
+      'Terraform/Pulumi modules for AWS, GCP, Azure',
+      'Managed service integration: RDS, S3, ElastiCache equivalents',
+      'Autoscaling configuration based on load metrics'
+    ],
+    tests: [
+      'Unit: Terraform module for AWS validates without errors',
+      'Unit: Pulumi program for GCP compiles and plans successfully',
+      'Unit: autoscaling config has min/max instance counts and target CPU metric',
+      'Integration: terraform apply creates all resources, API server connects to managed services'
+    ]
+  },
+  'REQ-16.4': {
+    acceptance: [
+      'Deployment to AWS Lambda, Google Cloud Functions, Azure Functions',
+      'Cold-start optimization: initialization under 2 seconds',
+      'Event triggers: HTTP, queue (SQS/PubSub), schedule (CloudWatch/Cron)'
+    ],
+    tests: [
+      'Unit: Lambda deployment package is under 50MB (zipped)',
+      'Unit: cold start completes initialization in under 2 seconds',
+      'Unit: HTTP trigger invokes the function and returns a response',
+      'Unit: queue trigger processes messages from SQS',
+      'Integration: scheduled trigger runs a daily batch agent successfully'
+    ]
+  },
+  'REQ-17.4': {
+    acceptance: [
+      'Adapter wraps LangChain tools as framework tools',
+      'Adapter exposes framework agents as LangChain chains',
+      'Python bridge via PyO3 for cross-language interop (if applicable)'
+    ],
+    tests: [
+      'Unit: LangChain tool adapter implements the framework Tool trait',
+      'Unit: framework agent adapter implements LangChain chain interface',
+      'Unit: tool adapter preserves input/output schema semantics',
+      'Integration: use a LangChain tool within a framework pipeline'
+    ]
+  },
+  'REQ-18.3': {
+    acceptance: [
+      'Budget definitions with period (daily, monthly) and dollar limits',
+      'Real-time spend tracking against budget',
+      'Actions on limit: warn, throttle (queue requests), block (reject requests)',
+      'Alert callbacks for monitoring integration'
+    ],
+    tests: [
+      'Unit: set daily budget of $10 for agent "researcher"',
+      'Unit: spend tracking accumulates costs across requests in real-time',
+      'Unit: warn action logs a warning when 80% of budget is consumed',
+      'Unit: block action rejects requests when 100% of budget is consumed',
+      'Integration: monthly budget of $100 with alert callback to Slack'
+    ]
+  }
+};
+
+// --- Card expand/collapse ---
+function toggleCardExpand(card, e) {
+  if (e) {
+    const target = e.target;
+    if (target.closest('.status-toggle') || target.closest('a') || target.closest('button')) return;
+  }
+  const isExpanded = card.classList.toggle('expanded');
+  let section = card.querySelector('.req-expand-section');
+  if (isExpanded && !section) {
+    const reqId = card.dataset.reqId;
+    const data = REQUIREMENT_TESTS[reqId];
+    if (!data) return;
+    section = document.createElement('div');
+    section.className = 'req-expand-section';
+    let html = '<hr class="req-expand-divider">';
+    html += '<div class="test-group acceptance">';
+    html += '<div class="test-group-title acceptance-title">Acceptance Criteria</div><ul>';
+    data.acceptance.forEach(function(a) { html += '<li>' + a + '</li>'; });
+    html += '</ul></div>';
+    html += '<div class="test-group testcases">';
+    html += '<div class="test-group-title testcases-title">Test Cases</div><ul>';
+    data.tests.forEach(function(t) { html += '<li>' + t + '</li>'; });
+    html += '</ul></div>';
+    section.innerHTML = html;
+    card.appendChild(section);
+  }
+  const hint = card.querySelector('.expand-hint');
+  if (hint) {
+    hint.textContent = isExpanded ? '▶ Click to collapse' : '▶ Click to view tests & acceptance criteria';
+    const arrow = document.createElement('span');
+    arrow.className = 'arrow';
+    arrow.textContent = '▶';
+    hint.prepend(arrow);
+    hint.replaceChild(arrow, hint.childNodes[0]);
+  }
+}
+
+function initExpandHints() {
+  document.querySelectorAll('.req-card').forEach(function(card) {
+    const hint = document.createElement('div');
+    hint.className = 'expand-hint';
+    hint.innerHTML = '<span class="arrow">▶</span> Click to view tests & acceptance criteria';
+    card.appendChild(hint);
+    card.addEventListener('click', function(e) { toggleCardExpand(card, e); });
+  });
+}
+initExpandHints();
 
 // Boot
 initBadges();
