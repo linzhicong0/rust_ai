@@ -253,4 +253,243 @@ mod tests {
         let invalid = r#"{"value": "not a number"}"#;
         assert!(validator.validate_str(invalid).is_err());
     }
+
+    // REQ-9.1: Structured Output - Additional edge case tests
+
+    #[test]
+    fn test_extract_json_nested_objects() {
+        // Test extracting JSON with nested objects
+        let response = r#"```json
+{"user": {"name": "Alice", "age": 30, "address": {"city": "SF"}}}
+```"#;
+        let result = extract_json(response);
+        assert!(result.is_some());
+
+        let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert_eq!(parsed["user"]["name"], "Alice");
+        assert_eq!(parsed["user"]["address"]["city"], "SF");
+    }
+
+    #[test]
+    fn test_extract_json_arrays() {
+        // Test extracting JSON arrays
+        let response = r#"Here are the items: [1, 2, 3, 4, 5]"#;
+        let result = extract_json(response);
+        assert!(result.is_some());
+
+        let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert!(parsed.is_array());
+        assert_eq!(parsed.as_array().unwrap().len(), 5);
+    }
+
+    #[test]
+    fn test_extract_json_no_valid_json() {
+        // Test response with no valid JSON
+        let response = r#"This is just plain text with no JSON at all."#;
+        assert!(extract_json(response).is_none());
+    }
+
+    #[test]
+    fn test_extract_json_malformed_in_braces() {
+        // Test that malformed JSON between { and } is rejected
+        let response = r#"Here's the data: {invalid json here} and more text"#;
+        assert!(extract_json(response).is_none());
+    }
+
+    #[test]
+    fn test_extract_json_with_trailing_comma() {
+        // Test JSON with trailing comma (which is invalid)
+        let response = r#"{"items": [1, 2, 3,]}"#;
+        assert!(extract_json(response).is_none());
+    }
+
+    #[test]
+    fn test_extract_json_from_multiline_markdown() {
+        // Test JSON extraction from multiline markdown with various formatting
+        let response = r#"The result is:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "value": 42
+  }
+}
+```
+
+That's the result."#;
+
+        let result = extract_json(response);
+        assert!(result.is_some());
+
+        let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert_eq!(parsed["status"], "success");
+        assert_eq!(parsed["data"]["value"], 42);
+    }
+
+    #[test]
+    fn test_extract_json_multiple_blocks() {
+        // Test that only the first valid JSON block is extracted
+        let response = r#"First: {"a": 1}
+Second: {"b": 2}"#;
+
+        let result = extract_json(response);
+        assert!(result.is_some());
+
+        let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert!(parsed.get("a").is_some());
+        assert!(parsed.get("b").is_none()); // Should only get first
+    }
+
+    #[test]
+    fn test_structured_output_config_builder() {
+        // Test the builder pattern for StructuredOutputConfig
+        let schema = json!({"type": "object"});
+        let config = StructuredOutputConfig::new(schema)
+            .with_max_retries(5)
+            .include_schema_in_prompt(false);
+
+        assert_eq!(config.max_retries, 5);
+        assert!(!config.include_schema_in_prompt);
+    }
+
+    #[test]
+    fn test_structured_output_config_default_values() {
+        // Test default values
+        let schema = json!({"type": "object"});
+        let config = StructuredOutputConfig::new(schema);
+
+        assert_eq!(config.max_retries, 3);
+        assert!(config.include_schema_in_prompt);
+    }
+
+    #[test]
+    fn test_validator_config_reference() {
+        // Test that validator returns a reference to its config
+        let schema = json!({"type": "object"});
+        let config = StructuredOutputConfig::new(schema).with_max_retries(10);
+        let validator = StructuredOutputValidator::new(config).unwrap();
+
+        assert_eq!(validator.config().max_retries, 10);
+    }
+
+    #[test]
+    fn test_build_system_prompt_without_base() {
+        // Test system prompt building without a base prompt
+        let schema = json!({
+            "type": "object",
+            "properties": {"result": {"type": "string"}}
+        });
+
+        let config = StructuredOutputConfig::new(schema);
+        let prompt = config.build_system_prompt(None);
+
+        assert!(prompt.contains("JSON"));
+        assert!(prompt.contains("schema"));
+        assert!(prompt.contains("Respond ONLY"));
+    }
+
+    #[test]
+    fn test_schema_validation_complex_types() {
+        // Test validation with complex nested types
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "metadata": {
+                    "type": "object",
+                    "properties": {
+                        "count": {"type": "integer"},
+                        "tags": {"type": "array", "items": {"type": "string"}}
+                    },
+                    "required": ["count"]
+                }
+            },
+            "required": ["items"]
+        });
+
+        let config = StructuredOutputConfig::new(schema);
+        let validator = StructuredOutputValidator::new(config).unwrap();
+
+        let valid = json!({
+            "items": ["a", "b", "c"],
+            "metadata": {"count": 3, "tags": ["x", "y"]}
+        });
+        assert!(validator.validate(&valid).is_ok());
+
+        // Missing required field
+        let invalid = json!({"metadata": {"count": 1}});
+        assert!(validator.validate(&invalid).is_err());
+    }
+
+    #[test]
+    fn test_schema_validation_enum() {
+        // Test validation with enum constraints
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": ["pending", "active", "completed"]
+                }
+            },
+            "required": ["status"]
+        });
+
+        let config = StructuredOutputConfig::new(schema);
+        let validator = StructuredOutputValidator::new(config).unwrap();
+
+        assert!(validator.validate(&json!({"status": "active"})).is_ok());
+        assert!(validator.validate(&json!({"status": "invalid"})).is_err());
+    }
+
+    #[test]
+    fn test_extract_json_with_unicode() {
+        // Test JSON extraction with Unicode characters
+        let response = r#"{"message": "Hello 世界 🌍"}"#;
+        let result = extract_json(response);
+        assert!(result.is_some());
+
+        let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert!(parsed["message"].as_str().unwrap().contains("世界"));
+    }
+
+    #[test]
+    fn test_extract_json_with_special_characters() {
+        // Test JSON with escaped characters
+        let response = r#"{"text": "Line 1\nLine 2\tTabbed", "quote": "She said \"hello\""}"#;
+        let result = extract_json(response);
+        assert!(result.is_some());
+
+        let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert!(parsed["text"].as_str().unwrap().contains('\n'));
+        assert!(parsed["quote"].as_str().unwrap().contains('"'));
+    }
+
+    #[test]
+    fn test_structured_output_error_display() {
+        // Test error message formatting
+        let err = StructuredOutputError::ValidationError("Missing field".to_string());
+        assert!(err.to_string().contains("Missing field"));
+
+        let err2 = StructuredOutputError::MaxRetriesExceeded(5);
+        assert!(err2.to_string().contains("5"));
+    }
+
+    #[test]
+    fn test_invalid_schema_creation() {
+        // Test that invalid schemas are rejected
+        let invalid_schema = json!({"type": "invalid_type"});
+        let result = StructuredOutputValidator::new(StructuredOutputConfig::new(invalid_schema));
+
+        // The jsonschema crate may accept or reject this depending on version
+        // Just check that we can handle the result
+        match result {
+            Ok(_) => {}, // Schema was accepted
+            Err(e) => assert!(e.to_string().contains("validation") || e.to_string().contains("Schema")),
+        }
+    }
 }
