@@ -141,19 +141,147 @@ pub fn extract_json(response: &str) -> Option<String> {
         }
     }
 
-    // Try to find the first { and last } and extract that
-    if let Some(start) = response.find('{') {
-        if let Some(end) = response.rfind('}') {
-            if end > start {
-                let json_str = &response[start..=end];
-                if serde_json::from_str::<Value>(json_str).is_ok() {
-                    return Some(json_str.to_string());
+    // Try to find the first complete JSON object or array by counting brackets.
+    // This correctly handles multiple JSON values in the same string.
+    for (open_char, close_char) in [('{', '}'), ('[', ']')] {
+        if let Some(start) = response.find(open_char) {
+            let mut depth: i32 = 0;
+            let mut in_string = false;
+            let mut escape_next = false;
+            let mut end: Option<usize> = None;
+
+            for (i, ch) in response[start..].char_indices() {
+                if escape_next {
+                    escape_next = false;
+                    continue;
+                }
+                match ch {
+                    '\\' if in_string => escape_next = true,
+                    '"' => in_string = !in_string,
+                    c if c == open_char && !in_string => depth += 1,
+                    c if c == close_char && !in_string => {
+                        depth -= 1;
+                        if depth == 0 {
+                            end = Some(start + i + ch.len_utf8());
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            if let Some(end) = end {
+                let candidate = &response[start..end];
+                if serde_json::from_str::<Value>(candidate).is_ok() {
+                    return Some(candidate.to_string());
                 }
             }
         }
     }
 
     None
+}
+
+/// Call a completion function and re-prompt on schema validation failure.
+///
+/// This is the implementation of REQ-9.1's "Re-prompt on validation failure
+/// (with retry limit)" requirement.
+///
+/// # Arguments
+///
+/// * `validator` — Validator holding the schema and retry configuration.
+/// * `complete_fn` — An async closure that receives the (possibly augmented)
+///   system prompt and returns the raw LLM response text.  Wrap your provider
+///   call inside this closure.
+///
+/// # Retry behaviour
+///
+/// On each failed attempt the validation error is appended to the prompt so
+/// the model can self-correct.  After `config.max_retries` failed attempts
+/// [`StructuredOutputError::MaxRetriesExceeded`] is returned.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// # use ai_core::structured::{StructuredOutputConfig, StructuredOutputValidator, complete_structured};
+/// # use serde_json::{json, Value};
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let schema = json!({"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]});
+/// let validator = StructuredOutputValidator::new(StructuredOutputConfig::new(schema))?;
+///
+/// let result = complete_structured(&validator, |prompt| {
+///     Box::pin(async move {
+///         // Call your provider here using `prompt` as the system message.
+///         Ok::<String, Box<dyn std::error::Error + Send + Sync>>(
+///             r#"{"answer": "42"}"#.to_string(),
+///         )
+///     })
+/// }).await?;
+///
+/// assert_eq!(result["answer"], "42");
+/// # Ok(())
+/// # }
+/// ```
+pub async fn complete_structured<F>(
+    validator: &StructuredOutputValidator,
+    mut complete_fn: F,
+) -> Result<Value, StructuredOutputError>
+where
+    F: FnMut(String) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<String, Box<dyn std::error::Error + Send + Sync>>> + Send>,
+    >,
+{
+    let base_prompt = validator.config().build_system_prompt(None);
+    let mut last_error: Option<String> = None;
+
+    for attempt in 0..=validator.config().max_retries {
+        // Build the prompt — augment with validation error on retries.
+        let prompt = match &last_error {
+            Some(err) if attempt > 0 => format!(
+                "{base_prompt}\n\nYour previous response was invalid JSON or did not match \
+                 the required schema. Error: {err}\n\nPlease respond with corrected JSON."
+            ),
+            _ => base_prompt.clone(),
+        };
+
+        let raw = complete_fn(prompt)
+            .await
+            .map_err(|e| StructuredOutputError::ValidationError(e.to_string()))?;
+
+        // Try to extract JSON from the response (handles markdown code blocks, etc.)
+        let json_str = match extract_json(&raw) {
+            Some(s) => s,
+            None => {
+                let msg = "Response contained no valid JSON".to_string();
+                if attempt < validator.config().max_retries {
+                    last_error = Some(msg);
+                    continue;
+                } else {
+                    return Err(StructuredOutputError::MaxRetriesExceeded(
+                        validator.config().max_retries,
+                    ));
+                }
+            }
+        };
+
+        match validator.validate_str(&json_str) {
+            Ok(value) => return Ok(value),
+            Err(e) => {
+                if attempt < validator.config().max_retries {
+                    last_error = Some(e.to_string());
+                } else {
+                    return Err(StructuredOutputError::MaxRetriesExceeded(
+                        validator.config().max_retries,
+                    ));
+                }
+            }
+        }
+    }
+
+    // Unreachable, but satisfies the compiler.
+    Err(StructuredOutputError::MaxRetriesExceeded(
+        validator.config().max_retries,
+    ))
 }
 
 #[cfg(test)]
@@ -252,6 +380,89 @@ mod tests {
 
         let invalid = r#"{"value": "not a number"}"#;
         assert!(validator.validate_str(invalid).is_err());
+    }
+
+    // REQ-9.1: Structured Output - Additional edge case tests
+
+    #[tokio::test]
+    async fn test_complete_structured_success_first_try() {
+        let schema = json!({
+            "type": "object",
+            "properties": {"value": {"type": "number"}},
+            "required": ["value"]
+        });
+        let validator = StructuredOutputValidator::new(
+            StructuredOutputConfig::new(schema)
+        ).unwrap();
+
+        let result = complete_structured(&validator, |_prompt| {
+            Box::pin(async move {
+                Ok::<String, Box<dyn std::error::Error + Send + Sync>>(
+                    r#"{"value": 42}"#.to_string(),
+                )
+            })
+        }).await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap()["value"], 42);
+    }
+
+    #[tokio::test]
+    async fn test_complete_structured_retries_on_invalid_json() {
+        let schema = json!({
+            "type": "object",
+            "properties": {"value": {"type": "number"}},
+            "required": ["value"]
+        });
+        let validator = StructuredOutputValidator::new(
+            StructuredOutputConfig::new(schema).with_max_retries(2)
+        ).unwrap();
+
+        let call_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let call_count2 = call_count.clone();
+
+        let result = complete_structured(&validator, move |_prompt| {
+            let n = call_count2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Box::pin(async move {
+                let response = if n == 0 {
+                    "not json at all".to_string()          // fail attempt 0
+                } else if n == 1 {
+                    r#"{"value": "wrong type"}"#.to_string() // fail attempt 1
+                } else {
+                    r#"{"value": 99}"#.to_string()          // succeed attempt 2
+                };
+                Ok::<String, Box<dyn std::error::Error + Send + Sync>>(response)
+            })
+        }).await;
+
+        assert!(result.is_ok(), "Expected Ok, got {result:?}");
+        assert_eq!(result.unwrap()["value"], 99);
+        assert_eq!(call_count.load(std::sync::atomic::Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn test_complete_structured_max_retries_exceeded() {
+        let schema = json!({
+            "type": "object",
+            "properties": {"value": {"type": "number"}},
+            "required": ["value"]
+        });
+        let validator = StructuredOutputValidator::new(
+            StructuredOutputConfig::new(schema).with_max_retries(1)
+        ).unwrap();
+
+        let result = complete_structured(&validator, |_prompt| {
+            Box::pin(async move {
+                Ok::<String, Box<dyn std::error::Error + Send + Sync>>(
+                    "still not json".to_string(),
+                )
+            })
+        }).await;
+
+        assert!(matches!(
+            result,
+            Err(StructuredOutputError::MaxRetriesExceeded(1))
+        ));
     }
 
     // REQ-9.1: Structured Output - Additional edge case tests

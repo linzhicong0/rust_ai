@@ -515,6 +515,7 @@ struct OpenAiResponseFunction {
 struct OpenAiUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
+    #[serde(default)]
     total_tokens: u32,
 }
 
@@ -958,8 +959,8 @@ mod tests {
                 break;
             }
             if let Some(data) = chunk.strip_prefix("data: ") {
-                if let Ok(parsed) = serde_json::from_str::<OpenAIStreamChunk>(data) {
-                    if let Some(delta) = parsed.choices.first().and_then(|c| c.delta.as_ref()) {
+                if let Ok(parsed) = serde_json::from_str::<OpenAiStreamChunk>(data) {
+                    if let Some(delta) = parsed.choices.first().map(|c| &c.delta) {
                         if let Some(content) = &delta.content {
                             accumulated.push_str(content);
                         }
@@ -976,11 +977,12 @@ mod tests {
         // Test handling of chunks with empty deltas (first chunk often has no content)
         let json = r#"{"id":"1","choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":null}]}"#;
 
-        let chunk = serde_json::from_str::<OpenAIStreamChunk>(json);
+        let chunk = serde_json::from_str::<OpenAiStreamChunk>(json);
         assert!(chunk.is_ok());
 
         let chunk = chunk.unwrap();
-        assert!(chunk.choices[0].delta.is_some());
+        // Delta struct exists but content field is None
+        assert!(chunk.choices[0].delta.content.is_none());
         // Delta exists but content is None
     }
 
@@ -992,13 +994,13 @@ mod tests {
             {"index":1,"delta":{"content":"Response B"}}
         ]}"#;
 
-        let chunk = serde_json::from_str::<OpenAIStreamChunk>(json);
+        let chunk = serde_json::from_str::<OpenAiStreamChunk>(json);
         assert!(chunk.is_ok());
 
         let chunk = chunk.unwrap();
         assert_eq!(chunk.choices.len(), 2);
-        assert_eq!(chunk.choices[0].index, 0);
-        assert_eq!(chunk.choices[1].index, 1);
+        assert_eq!(chunk.choices[0].delta.content.as_deref(), Some("Response A"));
+        assert_eq!(chunk.choices[1].delta.content.as_deref(), Some("Response B"));
     }
 
     #[test]
@@ -1014,7 +1016,7 @@ mod tests {
         for line in malformed_lines {
             // None of these should cause panics when attempting to parse
             if line.starts_with("data: ") && line.len() > 6 {
-                let _ = serde_json::from_str::<OpenAIStreamChunk>(&line[6..]);
+                let _ = serde_json::from_str::<OpenAiStreamChunk>(&line[6..]);
             }
         }
     }
@@ -1024,7 +1026,7 @@ mod tests {
         // Test final chunk with usage information
         let json = r#"{"id":"1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5}}"#;
 
-        let chunk = serde_json::from_str::<OpenAIStreamChunk>(json);
+        let chunk = serde_json::from_str::<OpenAiStreamChunk>(json);
         assert!(chunk.is_ok());
 
         let chunk = chunk.unwrap();

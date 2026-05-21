@@ -508,6 +508,8 @@ struct AnthropicStreamChunk {
 #[serde(untagged)]
 enum AnthropicStreamDelta {
     Text { text: String },
+    InputJson { partial_json: String },
+    Other(serde_json::Value),
 }
 
 #[cfg(test)]

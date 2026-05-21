@@ -46,6 +46,9 @@ pub use crate::guardrail::Guardrail;
 // Re-export configuration
 pub use crate::config::FrameworkConfig;
 
+// Re-export Client — primary entry point per REQ-15.1
+pub use crate::client::Client;
+
 // Re-export errors — users typically import these via `use ai_core::Error`
 // or use specific error variants like `ProviderError`
 pub use crate::error::{
@@ -57,9 +60,10 @@ pub use crate::error::{
 pub use crate::template::TemplateEngine;
 
 // Re-export structured output
-pub use crate::structured::{StructuredOutputConfig, StructuredOutputValidator, extract_json, StructuredOutputError};
+pub use crate::structured::{StructuredOutputConfig, StructuredOutputValidator, complete_structured, extract_json, StructuredOutputError};
 
 // Module declarations
+pub mod client;
 pub mod config;
 pub mod embedder;
 pub mod error;
@@ -93,6 +97,9 @@ pub mod prelude {
 
     // Configuration
     pub use crate::config::FrameworkConfig;
+
+    // Client entry point
+    pub use crate::client::Client;
 }
 
 /// Result type alias for convenience.

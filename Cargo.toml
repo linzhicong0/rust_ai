@@ -4,6 +4,7 @@ members = [
     "crates/ai-provider-openai",
     "crates/ai-provider-anthropic",
     "crates/ai-provider-ollama",
+    "crates/ai-provider-google",
     "crates/ai-agent",
     "crates/ai-tools",
     "crates/ai-tools-macros",

@@ -16,16 +16,13 @@ pub enum FrameworkConfigError {
 
     /// A referenced provider is not configured.
     #[error("Provider '{name}' is not configured")]
-    MissingProvider {
-        name: String,
-    },
+    MissingProvider { name: String },
 
     /// The API key for a provider is missing.
-    #[error("API key for provider '{provider}' not found. Set the {env_var} environment variable.")]
-    MissingApiKey {
-        provider: String,
-        env_var: String,
-    },
+    #[error(
+        "API key for provider '{provider}' not found. Set the {env_var} environment variable."
+    )]
+    MissingApiKey { provider: String, env_var: String },
 }
 
 /// Global framework configuration.
@@ -71,6 +68,14 @@ pub struct FrameworkConfig {
 
     /// REST API server settings.
     pub server: ServerConfig,
+
+    /// Logging verbosity level.
+    ///
+    /// Valid values: `"none"`, `"error"`, `"warn"`, `"info"` (default),
+    /// `"debug"`, `"trace"`.
+    /// Can be overridden with the `AI_LOGGING_LEVEL` environment variable.
+    #[serde(default = "FrameworkConfig::default_logging_level")]
+    pub logging_level: String,
 }
 
 impl FrameworkConfig {
@@ -134,13 +139,14 @@ impl FrameworkConfig {
                 config::Environment::with_prefix("AI")
                     .prefix_separator("__")
                     .separator("__")
-                    .try_parsing(true)
+                    .try_parsing(true),
             )
             .build()?;
 
         // Deserialize into FrameworkConfig
         // serde defaults will apply if values are missing
-        settings.try_deserialize()
+        settings
+            .try_deserialize()
             .map_err(FrameworkConfigError::from)
     }
 
@@ -168,11 +174,12 @@ impl FrameworkConfig {
                 config::Environment::with_prefix("AI")
                     .prefix_separator("__")
                     .separator("__")
-                    .try_parsing(true)
+                    .try_parsing(true),
             )
             .build()?;
 
-        settings.try_deserialize()
+        settings
+            .try_deserialize()
             .map_err(FrameworkConfigError::from)
     }
 
@@ -192,6 +199,14 @@ impl FrameworkConfig {
     /// Set the default model.
     pub fn with_default_model(mut self, model: impl Into<String>) -> Self {
         self.default_model = model.into();
+        self
+    }
+
+    /// Set the logging level.
+    ///
+    /// Valid values: `"none"`, `"error"`, `"warn"`, `"info"`, `"debug"`, `"trace"`.
+    pub fn with_logging_level(mut self, level: impl Into<String>) -> Self {
+        self.logging_level = level.into();
         self
     }
 
@@ -264,6 +279,12 @@ impl FrameworkConfig {
     }
 }
 
+impl FrameworkConfig {
+    fn default_logging_level() -> String {
+        "info".to_string()
+    }
+}
+
 impl Default for FrameworkConfig {
     fn default() -> Self {
         Self {
@@ -272,6 +293,7 @@ impl Default for FrameworkConfig {
             providers: HashMap::new(),
             agent: AgentConfig::default(),
             server: ServerConfig::default(),
+            logging_level: Self::default_logging_level(),
         }
     }
 }
@@ -291,10 +313,7 @@ pub struct ProviderConfig {
 
 impl ProviderConfig {
     /// Create a new provider configuration.
-    pub fn new(
-        api_key_env: impl Into<String>,
-        base_url: impl Into<String>,
-    ) -> Self {
+    pub fn new(api_key_env: impl Into<String>, base_url: impl Into<String>) -> Self {
         Self {
             api_key_env: api_key_env.into(),
             base_url: base_url.into(),
@@ -442,8 +461,7 @@ mod tests {
     fn test_config_with_provider() {
         let provider = ProviderConfig::new("OPENAI_API_KEY", "https://api.openai.com/v1");
 
-        let config = FrameworkConfig::default()
-            .with_provider("openai", provider);
+        let config = FrameworkConfig::default().with_provider("openai", provider);
 
         assert!(config.providers.contains_key("openai"));
         assert_eq!(
@@ -470,8 +488,7 @@ mod tests {
     fn test_config_get_provider() {
         let provider = ProviderConfig::new("OPENAI_API_KEY", "https://api.openai.com/v1");
 
-        let config = FrameworkConfig::default()
-            .with_provider("openai", provider);
+        let config = FrameworkConfig::default().with_provider("openai", provider);
 
         let retrieved = config.get_provider("openai");
         assert!(retrieved.is_some());
@@ -485,8 +502,7 @@ mod tests {
     fn test_config_has_provider_api_key() {
         let provider = ProviderConfig::new("NONEXISTENT_VAR", "https://api.openai.com/v1");
 
-        let config = FrameworkConfig::default()
-            .with_provider("openai", provider);
+        let config = FrameworkConfig::default().with_provider("openai", provider);
 
         // Environment variable not set
         assert!(!config.has_provider_api_key("openai"));
@@ -502,8 +518,7 @@ mod tests {
 
         let provider = ProviderConfig::new("TEST_API_KEY", "https://api.openai.com/v1");
 
-        let config = FrameworkConfig::default()
-            .with_provider("test", provider);
+        let config = FrameworkConfig::default().with_provider("test", provider);
 
         assert!(config.has_provider_api_key("test"));
 
@@ -518,8 +533,7 @@ mod tests {
 
         let provider = ProviderConfig::new("TEST_EMPTY_KEY", "https://api.openai.com/v1");
 
-        let config = FrameworkConfig::default()
-            .with_provider("test", provider);
+        let config = FrameworkConfig::default().with_provider("test", provider);
 
         // Empty string should count as not having a key
         assert!(!config.has_provider_api_key("test"));
@@ -530,8 +544,7 @@ mod tests {
 
     #[test]
     fn test_config_validate_missing_provider() {
-        let config = FrameworkConfig::default()
-            .with_default_provider("nonexistent");
+        let config = FrameworkConfig::default().with_default_provider("nonexistent");
 
         let result = config.validate();
         assert!(result.is_err());
@@ -577,8 +590,7 @@ mod tests {
     fn test_config_with_agent_config() {
         let agent_config = AgentConfig::new(20, 0.8);
 
-        let config = FrameworkConfig::default()
-            .with_agent_config(agent_config);
+        let config = FrameworkConfig::default().with_agent_config(agent_config);
 
         assert_eq!(config.agent.max_iterations, 20);
         assert_eq!(config.agent.default_temperature, 0.8);
@@ -697,8 +709,7 @@ mod tests {
 
     #[test]
     fn test_provider_config_clone() {
-        let provider = ProviderConfig::new("KEY", "https://api.com")
-            .with_default_model("model-1");
+        let provider = ProviderConfig::new("KEY", "https://api.com").with_default_model("model-1");
         let cloned = provider.clone();
 
         assert_eq!(cloned.api_key_env, "KEY");
@@ -726,16 +737,14 @@ mod tests {
 
     #[test]
     fn test_config_with_default_provider_string() {
-        let config = FrameworkConfig::default()
-            .with_default_provider(String::from("anthropic"));
+        let config = FrameworkConfig::default().with_default_provider(String::from("anthropic"));
 
         assert_eq!(config.default_provider, "anthropic");
     }
 
     #[test]
     fn test_config_with_default_model_string() {
-        let config = FrameworkConfig::default()
-            .with_default_model(String::from("claude-3-opus"));
+        let config = FrameworkConfig::default().with_default_model(String::from("claude-3-opus"));
 
         assert_eq!(config.default_model, "claude-3-opus");
     }

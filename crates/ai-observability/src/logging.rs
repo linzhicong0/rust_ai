@@ -3,12 +3,10 @@
 //! Provides configurable logging with JSON output, multiple verbosity levels,
 //! and automatic instrumentation of request/response cycles.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::{debug, error, info, span, Level, Span};
-use tracing_subscriber::{
-    fmt::format::FmtSpan, prelude::*, registry::Registry, EnvFilter, Layer,
-};
+use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, registry::Registry, EnvFilter, Layer};
 
 /// Verbosity level for logging output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
@@ -141,8 +139,7 @@ impl LoggingConfig {
             None => "off",
         };
 
-        EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| EnvFilter::new(base))
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(base))
     }
 
     fn init_json_logging(&self, env_filter: EnvFilter) -> Result<(), LoggingError> {
@@ -213,11 +210,7 @@ impl LlmRequestLogger {
     /// Begin logging a new LLM request.
     ///
     /// Creates a tracing span with the request details for hierarchical logging.
-    pub fn request(
-        provider: &str,
-        model: &str,
-        messages_count: usize,
-    ) -> Self {
+    pub fn request(provider: &str, model: &str, messages_count: usize) -> Self {
         let _span = span!(
             Level::INFO,
             "llm_request",
@@ -239,12 +232,7 @@ impl LlmRequestLogger {
     /// Log the response and complete the request logging.
     ///
     /// Automatically calculates and logs timing information.
-    pub fn complete(
-        self,
-        prompt_tokens: u32,
-        completion_tokens: u32,
-        finish_reason: &str,
-    ) {
+    pub fn complete(self, prompt_tokens: u32, completion_tokens: u32, finish_reason: &str) {
         let elapsed = self.start.elapsed();
 
         let total_tokens = prompt_tokens + completion_tokens;
@@ -275,17 +263,151 @@ impl LlmRequestLogger {
     }
 }
 
+/// A complete record of a single LLM request/response cycle.
+///
+/// Serializes to structured JSON for machine parsing and audit trails.
+/// Log with `tracing::info!(interaction = ?record, "llm_interaction")` or
+/// use [`log_llm_interaction`] directly.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmInteractionRecord {
+    /// Provider name (e.g., "openai", "anthropic").
+    pub provider: String,
+    /// Model name (e.g., "gpt-4o", "claude-3-opus-20240229").
+    pub model: String,
+    /// Input messages sent to the model, serialized as JSON.
+    pub input_messages: Vec<serde_json::Value>,
+    /// Raw text of the first assistant response, if any.
+    pub output_text: Option<String>,
+    /// Whether the response contained tool calls.
+    pub had_tool_calls: bool,
+    /// Number of prompt tokens consumed.
+    pub prompt_tokens: u32,
+    /// Number of completion tokens generated.
+    pub completion_tokens: u32,
+    /// Total tokens (prompt + completion).
+    pub total_tokens: u32,
+    /// End-to-end latency in milliseconds.
+    pub latency_ms: u128,
+    /// Model's reported finish reason (e.g., "stop", "length", "tool_calls").
+    pub finish_reason: String,
+    /// Whether the request succeeded.
+    pub success: bool,
+    /// Error message if the request failed.
+    pub error: Option<String>,
+}
+
+/// Log a complete LLM interaction as a single structured JSON event.
+///
+/// This is the primary hook for satisfying REQ-11.1: every request/response
+/// pair is captured with timing, tokens, and content in one place.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use ai_observability::logging::{LlmInteractionRecord, log_llm_interaction};
+///
+/// let record = LlmInteractionRecord {
+///     provider: "openai".to_string(),
+///     model: "gpt-4o".to_string(),
+///     input_messages: vec![],
+///     output_text: Some("Hello!".to_string()),
+///     had_tool_calls: false,
+///     prompt_tokens: 20,
+///     completion_tokens: 5,
+///     total_tokens: 25,
+///     latency_ms: 312,
+///     finish_reason: "stop".to_string(),
+///     success: true,
+///     error: None,
+/// };
+/// log_llm_interaction(&record);
+/// ```
+pub fn log_llm_interaction(record: &LlmInteractionRecord) {
+    if record.success {
+        info!(
+            provider = %record.provider,
+            model = %record.model,
+            prompt_tokens = record.prompt_tokens,
+            completion_tokens = record.completion_tokens,
+            total_tokens = record.total_tokens,
+            latency_ms = record.latency_ms,
+            finish_reason = %record.finish_reason,
+            had_tool_calls = record.had_tool_calls,
+            "llm_interaction"
+        );
+    } else {
+        error!(
+            provider = %record.provider,
+            model = %record.model,
+            latency_ms = record.latency_ms,
+            error = ?record.error,
+            "llm_interaction_failed"
+        );
+    }
+}
+
+impl LlmRequestLogger {
+    /// Build an [`LlmInteractionRecord`] and log it in one step.
+    ///
+    /// Call this from provider implementations after receiving a response.
+    pub fn record_and_log(
+        provider: &str,
+        model: &str,
+        input_messages: Vec<serde_json::Value>,
+        output_text: Option<String>,
+        had_tool_calls: bool,
+        prompt_tokens: u32,
+        completion_tokens: u32,
+        finish_reason: &str,
+        start: std::time::Instant,
+    ) {
+        let record = LlmInteractionRecord {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            input_messages,
+            output_text,
+            had_tool_calls,
+            prompt_tokens,
+            completion_tokens,
+            total_tokens: prompt_tokens + completion_tokens,
+            latency_ms: start.elapsed().as_millis(),
+            finish_reason: finish_reason.to_string(),
+            success: true,
+            error: None,
+        };
+        log_llm_interaction(&record);
+    }
+
+    /// Build and log a failed interaction record.
+    pub fn record_and_log_error(
+        provider: &str,
+        model: &str,
+        error: &str,
+        start: std::time::Instant,
+    ) {
+        let record = LlmInteractionRecord {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            input_messages: vec![],
+            output_text: None,
+            had_tool_calls: false,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens: 0,
+            latency_ms: start.elapsed().as_millis(),
+            finish_reason: "error".to_string(),
+            success: false,
+            error: Some(error.to_string()),
+        };
+        log_llm_interaction(&record);
+    }
+}
+
 /// Log streaming chunk information.
-pub fn log_stream_chunk(
-    delta: Option<&str>,
-    finish_reason: Option<&str>,
-) {
+pub fn log_stream_chunk(delta: Option<&str>, finish_reason: Option<&str>) {
     match (delta, finish_reason) {
         (Some(text), None) => {
-            debug!(
-                delta_length = text.len(),
-                "Stream chunk received"
-            );
+            debug!(delta_length = text.len(), "Stream chunk received");
         }
         (_, Some(reason)) => {
             debug!(
@@ -298,10 +420,7 @@ pub fn log_stream_chunk(
 }
 
 /// Log tool execution.
-pub fn log_tool_call(
-    tool_name: &str,
-    input: &str,
-) {
+pub fn log_tool_call(tool_name: &str, input: &str) {
     info!(
         tool = %tool_name,
         input_length = input.len(),
@@ -310,11 +429,7 @@ pub fn log_tool_call(
 }
 
 /// Log tool execution result.
-pub fn log_tool_result(
-    tool_name: &str,
-    success: bool,
-    duration: Duration,
-) {
+pub fn log_tool_result(tool_name: &str, success: bool, duration: Duration) {
     if success {
         info!(
             tool = %tool_name,
@@ -331,11 +446,7 @@ pub fn log_tool_result(
 }
 
 /// Log agent iteration in the ReAct loop.
-pub fn log_agent_iteration(
-    agent_name: &str,
-    iteration: u32,
-    thinking: Option<&str>,
-) {
+pub fn log_agent_iteration(agent_name: &str, iteration: u32, thinking: Option<&str>) {
     if let Some(thought) = thinking {
         debug!(
             agent = %agent_name,
@@ -353,10 +464,7 @@ pub fn log_agent_iteration(
 }
 
 /// Log pipeline step execution.
-pub fn log_pipeline_step(
-    pipeline_name: &str,
-    step_name: &str,
-) {
+pub fn log_pipeline_step(pipeline_name: &str, step_name: &str) {
     info!(
         pipeline = %pipeline_name,
         step = %step_name,
@@ -365,10 +473,7 @@ pub fn log_pipeline_step(
 }
 
 /// Log caching events.
-pub fn log_cache_hit(
-    key: &str,
-    hit: bool,
-) {
+pub fn log_cache_hit(key: &str, hit: bool) {
     if hit {
         debug!(
             cache_key = %key,

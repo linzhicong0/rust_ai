@@ -7,11 +7,27 @@ use serde_json::Value;
 use std::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
 
+use std::sync::Arc;
+
 use crate::context::PipelineContext;
 use crate::step::Step;
 
 /// Re-export PipelineError from ai-core for convenience.
 pub use ai_core::error::PipelineError;
+
+/// Type alias for an async agent executor callback.
+///
+/// The callback receives the agent name and input value, and returns
+/// the agent's output or a [`PipelineError`].
+pub type AgentExecutorFn = Arc<
+    dyn Fn(
+            String,
+            serde_json::Value,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<serde_json::Value, PipelineError>> + Send>,
+        > + Send
+        + Sync,
+>;
 
 /// A pipeline that executes a series of steps.
 ///
@@ -60,6 +76,13 @@ pub struct Pipeline {
 
     /// Whether to continue executing steps after an error.
     pub continue_on_error: bool,
+
+    /// Optional agent executor to run `Task` steps.
+    ///
+    /// Set via [`Pipeline::with_agent_executor`] or
+    /// [`PipelineBuilder::with_agent_executor`]. If `None`, task steps that
+    /// invoke agents will return a [`PipelineError::Context`] error.
+    pub agent_executor: Option<AgentExecutorFn>,
 }
 
 impl Pipeline {
@@ -83,7 +106,41 @@ impl Pipeline {
             steps,
             timeout: None,
             continue_on_error: false,
+            agent_executor: None,
         }
+    }
+
+    /// Attach an agent executor to this pipeline.
+    ///
+    /// The executor is called for every [`Step::task`] step. It receives the
+    /// agent name and the task input, and must return the agent output.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use ai_pipeline::{Pipeline, Step};
+    /// use serde_json::json;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let pipeline = Pipeline::builder("demo")
+    ///     .step(Step::task("greet", "greeter", "input", "output"))
+    ///     .build()?
+    ///     .with_agent_executor(|agent, input| Box::pin(async move {
+    ///         Ok(json!(format!("[{}] processed: {}", agent, input)))
+    ///     }));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_agent_executor<F, Fut>(mut self, f: F) -> Self
+    where
+        F: Fn(String, serde_json::Value) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<serde_json::Value, PipelineError>>
+            + Send
+            + 'static,
+    {
+        self.agent_executor = Some(Arc::new(move |name, input| Box::pin(f(name, input))));
+        self
     }
 
     /// Create a pipeline builder for fluent construction.
@@ -247,20 +304,25 @@ impl Pipeline {
         Ok(())
     }
 
-    /// Execute an agent (placeholder implementation).
+    /// Execute an agent via the configured [`AgentExecutorFn`].
+    ///
+    /// Returns `PipelineError::Context` if no executor has been configured.
     async fn execute_agent(
         &self,
         agent_name: &str,
         input: &serde_json::Value,
     ) -> Result<serde_json::Value, PipelineError> {
-        // TODO: Look up agent by name and execute
-        // For now, just pass through the input as output
-        debug!("Executing agent '{}' (placeholder)", agent_name);
-
-        // Simulate agent execution
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-
-        Ok(input.clone())
+        match &self.agent_executor {
+            Some(executor) => {
+                debug!("Executing agent '{}' via configured executor", agent_name);
+                executor(agent_name.to_string(), input.clone()).await
+            }
+            None => Err(PipelineError::Context(format!(
+                "No agent executor configured for pipeline '{}'. \
+                 Call Pipeline::with_agent_executor() before executing agent step '{}'",
+                self.name, agent_name
+            ))),
+        }
     }
 
     /// Execute an agent with retry policy.
@@ -449,6 +511,7 @@ pub struct PipelineBuilder {
     steps: Vec<Step>,
     timeout: Option<Duration>,
     continue_on_error: bool,
+    agent_executor: Option<AgentExecutorFn>,
 }
 
 impl PipelineBuilder {
@@ -459,7 +522,20 @@ impl PipelineBuilder {
             steps: Vec::new(),
             timeout: None,
             continue_on_error: false,
+            agent_executor: None,
         }
+    }
+
+    /// Attach an agent executor — see [`Pipeline::with_agent_executor`].
+    pub fn with_agent_executor<F, Fut>(mut self, f: F) -> Self
+    where
+        F: Fn(String, serde_json::Value) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<serde_json::Value, PipelineError>>
+            + Send
+            + 'static,
+    {
+        self.agent_executor = Some(Arc::new(move |name, input| Box::pin(f(name, input))));
+        self
     }
 
     /// Add a sequential step to the pipeline.
@@ -682,6 +758,7 @@ impl PipelineBuilder {
             steps: self.steps,
             timeout: self.timeout,
             continue_on_error: self.continue_on_error,
+            agent_executor: self.agent_executor,
         })
     }
 }
@@ -744,11 +821,12 @@ mod tests {
         let pipeline = Pipeline::builder("test")
             .step(Step::task("s1", "agent", "input", "output"))
             .build()
-            .unwrap();
+            .unwrap()
+            .with_agent_executor(|_agent, input| Box::pin(async move { Ok(input) }));
 
         let result = pipeline.execute(json!("test")).await.unwrap();
         assert_eq!(result.get("input"), Some(&json!("test")));
-        // The placeholder implementation passes input through to output
+        // Executor passes input through to output
         assert_eq!(result.get("output"), Some(&json!("test")));
     }
 
@@ -761,7 +839,8 @@ mod tests {
                 Step::task("s2b", "agent2b", "out1", "out2b"),
             ])
             .build()
-            .unwrap();
+            .unwrap()
+            .with_agent_executor(|_agent, input| Box::pin(async move { Ok(input) }));
 
         let result = pipeline.execute(json!("test")).await.unwrap();
         // All outputs should exist from parallel execution
@@ -782,7 +861,8 @@ mod tests {
                 Some(Step::task("else_branch", "agent", "decision", "result")),
             )
             .build()
-            .unwrap();
+            .unwrap()
+            .with_agent_executor(|_agent, input| Box::pin(async move { Ok(input) }));
 
         let result = pipeline.execute(json!("input")).await.unwrap();
         // s1 sets decision to "input", so then_branch should run
