@@ -172,9 +172,7 @@ impl Provider for OllamaProvider {
             usage: Usage {
                 prompt_tokens: ollama_response.prompt_eval_count.unwrap_or(0),
                 completion_tokens: ollama_response.eval_count.unwrap_or(0),
-                total_tokens: ollama_response
-                    .prompt_eval_count
-                    .unwrap_or(0)
+                total_tokens: ollama_response.prompt_eval_count.unwrap_or(0)
                     + ollama_response.eval_count.unwrap_or(0),
             },
             finish_reason: FinishReason::Stop,
@@ -403,15 +401,14 @@ mod tests {
 
     #[test]
     fn test_provider_with_custom_base_url() {
-        let provider = OllamaProvider::new()
-            .with_base_url("http://remote-ollama:11434/api".to_string());
+        let provider =
+            OllamaProvider::new().with_base_url("http://remote-ollama:11434/api".to_string());
         assert_eq!(provider.base_url, "http://remote-ollama:11434/api");
     }
 
     #[test]
     fn test_provider_with_json_mode() {
-        let provider = OllamaProvider::new()
-            .with_json_mode(true);
+        let provider = OllamaProvider::new().with_json_mode(true);
         assert!(provider.json_mode);
     }
 
@@ -618,7 +615,8 @@ mod tests {
     #[test]
     fn test_ollama_response_without_usage() {
         // Some responses may not include usage information
-        let json = r#"{"model":"llama3","message":{"role":"assistant","content":"Hello"},"done":true}"#;
+        let json =
+            r#"{"model":"llama3","message":{"role":"assistant","content":"Hello"},"done":true}"#;
 
         let response = serde_json::from_str::<OllamaChatResponse>(json);
         assert!(response.is_ok());
@@ -659,7 +657,8 @@ mod tests {
 
 {"model":"llama3","message":{"content":"C"},"done":false}"#;
 
-        let count = input.lines()
+        let count = input
+            .lines()
             .filter(|line| !line.is_empty())
             .filter(|line| serde_json::from_str::<OllamaStreamChunk>(line).is_ok())
             .count();
@@ -674,7 +673,8 @@ mod tests {
 not valid json
 {"model":"llama3","message":{"content":"Also valid"},"done":false}"#;
 
-        let valid_count = input.lines()
+        let valid_count = input
+            .lines()
             .filter(|line| serde_json::from_str::<OllamaStreamChunk>(line).is_ok())
             .count();
 

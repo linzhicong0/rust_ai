@@ -269,9 +269,9 @@ impl Tool for FileWrite {
         // Create parent directories if requested
         if input.create_dirs {
             if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)
-                    .await
-                    .map_err(|e| ToolError::Execution(format!("Failed to create directories: {}", e)))?;
+                fs::create_dir_all(parent).await.map_err(|e| {
+                    ToolError::Execution(format!("Failed to create directories: {}", e))
+                })?;
             }
         }
 
@@ -377,7 +377,9 @@ impl Tool for FileList {
 
             while let Some(current_dir) = stack.pop() {
                 if let Ok(mut dir) = fs::read_dir(&current_dir).await {
-                    while let Some(entry) = dir.next_entry().await
+                    while let Some(entry) = dir
+                        .next_entry()
+                        .await
                         .map_err(|e| ToolError::Execution(format!("Failed to read entry: {}", e)))?
                     {
                         let entry_path = entry.path();
@@ -387,8 +389,9 @@ impl Tool for FileList {
                             .to_string_lossy()
                             .to_string();
 
-                        let metadata = entry.metadata().await
-                            .map_err(|e| ToolError::Execution(format!("Failed to get metadata: {}", e)))?;
+                        let metadata = entry.metadata().await.map_err(|e| {
+                            ToolError::Execution(format!("Failed to get metadata: {}", e))
+                        })?;
 
                         let entry_type = if metadata.is_dir() {
                             stack.push(entry_path.clone());
@@ -413,11 +416,15 @@ impl Tool for FileList {
                 .await
                 .map_err(|e| ToolError::Execution(format!("Failed to read directory: {}", e)))?;
 
-            while let Some(entry) = dir.next_entry().await
+            while let Some(entry) = dir
+                .next_entry()
+                .await
                 .map_err(|e| ToolError::Execution(format!("Failed to read entry: {}", e)))?
             {
                 let name = entry.file_name().to_string_lossy().to_string();
-                let metadata = entry.metadata().await
+                let metadata = entry
+                    .metadata()
+                    .await
                     .map_err(|e| ToolError::Execution(format!("Failed to get metadata: {}", e)))?;
 
                 let entry_type = if metadata.is_dir() {
@@ -519,13 +526,10 @@ mod tests {
     #[tokio::test]
     async fn test_file_read_outside_base_dir() {
         let temp = TempDir::new().unwrap();
-        let config = FileToolConfig::default()
-            .with_base_dir(temp.path());
+        let config = FileToolConfig::default().with_base_dir(temp.path());
 
         let tool = FileRead::with_config(config);
-        let result = tool
-            .execute(json!({"path": "/etc/passwd"}))
-            .await;
+        let result = tool.execute(json!({"path": "/etc/passwd"})).await;
 
         assert!(result.is_err());
     }
@@ -533,8 +537,12 @@ mod tests {
     #[tokio::test]
     async fn test_file_list() {
         let temp = TempDir::new().unwrap();
-        fs::write(temp.path().join("file1.txt"), "content1").await.unwrap();
-        fs::write(temp.path().join("file2.txt"), "content2").await.unwrap();
+        fs::write(temp.path().join("file1.txt"), "content1")
+            .await
+            .unwrap();
+        fs::write(temp.path().join("file2.txt"), "content2")
+            .await
+            .unwrap();
         fs::create_dir(temp.path().join("subdir")).await.unwrap();
 
         let config = FileToolConfig::default()

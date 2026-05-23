@@ -8,11 +8,11 @@
 use std::sync::Arc;
 
 use ai_core::error::AgentError;
-use ai_core::CostTracker;
 use ai_core::memory::Memory;
 use ai_core::provider::Provider;
 use ai_core::tool::Tool;
 use ai_core::types::ModelConfig;
+use ai_core::CostTracker;
 
 use super::agent::{Agent, AgentInner};
 
@@ -223,7 +223,9 @@ where
     ///
     /// Panics if no provider was set (should be prevented by type system).
     pub fn build(self) -> Result<Agent<P, M>, AgentError> {
-        let provider = self.provider.expect("Provider should be set in HasProvider state");
+        let provider = self
+            .provider
+            .expect("Provider should be set in HasProvider state");
 
         let inner = AgentInner {
             provider,
@@ -312,11 +314,17 @@ mod tests {
             _messages: Vec<ai_core::types::Message>,
             _config: &ModelConfig,
             _tools: &[ai_core::tool::ToolDescriptor],
-        ) -> futures::stream::BoxStream<'static, Result<ai_core::types::StreamChunk, ai_core::error::ProviderError>> {
+        ) -> futures::stream::BoxStream<
+            'static,
+            Result<ai_core::types::StreamChunk, ai_core::error::ProviderError>,
+        > {
             Box::pin(futures::stream::empty())
         }
 
-        async fn embed(&self, _texts: Vec<String>) -> Result<Vec<Vec<f32>>, ai_core::error::ProviderError> {
+        async fn embed(
+            &self,
+            _texts: Vec<String>,
+        ) -> Result<Vec<Vec<f32>>, ai_core::error::ProviderError> {
             Ok(vec![vec![0.0; 10]])
         }
 

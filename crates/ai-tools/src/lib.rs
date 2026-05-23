@@ -47,7 +47,7 @@ pub mod shell;
 
 // Re-export main tool types
 pub use code::{CodeExec, CodeExecConfig, CodeExecResult, CodeLanguage};
-pub use file::{FileList, FileRead, FileWrite, FileToolConfig};
+pub use file::{FileList, FileRead, FileToolConfig, FileWrite};
 pub use http::{HttpFetch, HttpHead, HttpToolConfig};
 pub use search::{SearchConfig, SearchProvider, SearchResult, WebSearch};
 pub use shell::{SafeShell, ShellConfig, ShellExec};

@@ -36,8 +36,8 @@ use ai_core::error::ProviderError;
 use ai_core::provider::Provider;
 use ai_core::tool::ToolDescriptor;
 use ai_core::types::{
-    CompletionResponse, Content, ContentPart, FinishReason, Message,
-    ModelConfig, Role, StreamChunk, ToolCall, Usage,
+    CompletionResponse, Content, ContentPart, FinishReason, Message, ModelConfig, Role,
+    StreamChunk, ToolCall, Usage,
 };
 
 /// Anthropic API provider for Claude models.
@@ -105,17 +105,19 @@ impl AnthropicProvider {
                 let items: Vec<AnthropicContentPart> = parts
                     .into_iter()
                     .map(|p| match p {
-                        ContentPart::Text(t) => {
-                            AnthropicContentPart::Text { type_: "text".to_string(), text: t }
-                        }
-                        ContentPart::Image { url, media_type, .. } => {
+                        ContentPart::Text(t) => AnthropicContentPart::Text {
+                            type_: "text".to_string(),
+                            text: t,
+                        },
+                        ContentPart::Image {
+                            url, media_type, ..
+                        } => {
                             // Extract base64 data if present
                             let (source, media_type) = if url.starts_with("data:") {
                                 let parts: Vec<&str> = url.splitn(2, ':').collect();
                                 let media_part = parts.get(1).unwrap_or(&"");
-                                let (media_type, base64_data) = media_part
-                                    .split_once(';')
-                                    .unwrap_or(("image/jpeg", ""));
+                                let (media_type, base64_data) =
+                                    media_part.split_once(';').unwrap_or(("image/jpeg", ""));
                                 let base64_data = base64_data.strip_prefix("base64,").unwrap_or("");
                                 (
                                     AnthropicSource {
@@ -135,9 +137,14 @@ impl AnthropicProvider {
                                     media_type,
                                 )
                             };
-                            AnthropicContentPart::Image { type_: "image".to_string(), source }
+                            AnthropicContentPart::Image {
+                                type_: "image".to_string(),
+                                source,
+                            }
                         }
-                        ContentPart::ImageBytes { data, media_type, .. } => {
+                        ContentPart::ImageBytes {
+                            data, media_type, ..
+                        } => {
                             // Convert bytes to base64
                             use base64::prelude::*;
                             let base64 = BASE64_STANDARD.encode(&data);
@@ -146,7 +153,10 @@ impl AnthropicProvider {
                                 media_type: media_type.clone(),
                                 data: base64,
                             };
-                            AnthropicContentPart::Image { type_: "image".to_string(), source }
+                            AnthropicContentPart::Image {
+                                type_: "image".to_string(),
+                                source,
+                            }
                         }
                     })
                     .collect();
@@ -244,7 +254,8 @@ impl Provider for AnthropicProvider {
             usage: Usage {
                 prompt_tokens: anthropic_response.usage.input_tokens,
                 completion_tokens: anthropic_response.usage.output_tokens,
-                total_tokens: anthropic_response.usage.input_tokens + anthropic_response.usage.output_tokens,
+                total_tokens: anthropic_response.usage.input_tokens
+                    + anthropic_response.usage.output_tokens,
             },
             finish_reason: match anthropic_response.stop_reason.as_str() {
                 "end_turn" => FinishReason::Stop,
@@ -390,9 +401,7 @@ impl Provider for AnthropicProvider {
 }
 
 impl AnthropicProvider {
-    fn extract_content_and_tools(
-        content: &[AnthropicResponseContent],
-    ) -> (String, Vec<ToolCall>) {
+    fn extract_content_and_tools(content: &[AnthropicResponseContent]) -> (String, Vec<ToolCall>) {
         let mut text = String::new();
         let mut tool_calls = Vec::new();
 
@@ -436,8 +445,14 @@ enum AnthropicContent {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 enum AnthropicContentPart {
-    Text { type_: String, text: String },
-    Image { type_: String, source: AnthropicSource },
+    Text {
+        type_: String,
+        text: String,
+    },
+    Image {
+        type_: String,
+        source: AnthropicSource,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -492,9 +507,16 @@ enum AnthropicResponseContent {
     #[serde(alias = "text")]
     Text { text: String },
     #[serde(alias = "tool_use")]
-    ToolUse { id: String, name: String, input: serde_json::Value },
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
     #[serde(alias = "tool_result")]
-    ToolResult { tool_use_id: String, content: String },
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+    },
     #[serde(alias = "image")]
     Image { source: AnthropicSource },
 }
@@ -539,8 +561,7 @@ mod tests {
 
     #[test]
     fn test_provider_with_json_mode() {
-        let provider = AnthropicProvider::new("sk-ant-test".to_string())
-            .with_json_mode(true);
+        let provider = AnthropicProvider::new("sk-ant-test".to_string()).with_json_mode(true);
         assert!(provider.json_mode);
     }
 
@@ -629,10 +650,7 @@ mod tests {
 
     #[test]
     fn test_convert_messages() {
-        let messages = vec![
-            Message::user("Hello"),
-            Message::assistant("Hi there"),
-        ];
+        let messages = vec![Message::user("Hello"), Message::assistant("Hi there")];
 
         let anthropic_messages = AnthropicProvider::convert_messages(messages);
 
@@ -643,10 +661,7 @@ mod tests {
 
     #[test]
     fn test_convert_system_messages() {
-        let messages = vec![
-            Message::system("You are helpful"),
-            Message::user("Hello"),
-        ];
+        let messages = vec![Message::system("You are helpful"), Message::user("Hello")];
 
         let anthropic_messages = AnthropicProvider::convert_messages(messages);
 
@@ -720,16 +735,17 @@ mod tests {
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, "tool_123");
         assert_eq!(tool_calls[0].name, "search");
-        assert_eq!(tool_calls[0].arguments, serde_json::json!({"query": "test"}));
+        assert_eq!(
+            tool_calls[0].arguments,
+            serde_json::json!({"query": "test"})
+        );
     }
 
     #[test]
     fn test_extract_content_only_text() {
-        let content = vec![
-            AnthropicResponseContent::Text {
-                text: "Hello, world!".to_string(),
-            },
-        ];
+        let content = vec![AnthropicResponseContent::Text {
+            text: "Hello, world!".to_string(),
+        }];
 
         let (text, tool_calls) = AnthropicProvider::extract_content_and_tools(&content);
 
@@ -803,7 +819,8 @@ mod tests {
 
     #[test]
     fn test_anthropic_stream_chunk_message_stop() {
-        let json = r#"{"type":"message_stop","message_usage":{"input_tokens":10,"output_tokens":5}}"#;
+        let json =
+            r#"{"type":"message_stop","message_usage":{"input_tokens":10,"output_tokens":5}}"#;
 
         let chunk = serde_json::from_str::<AnthropicStreamChunk>(json);
         assert!(chunk.is_ok());

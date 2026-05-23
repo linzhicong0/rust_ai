@@ -45,9 +45,8 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use tera::{Tera, Context as TeraContext};
+use tera::{Context as TeraContext, Tera};
 use tracing::{debug, info};
-
 
 /// Prompt template engine using Tera.
 ///
@@ -91,7 +90,8 @@ impl TemplateEngine {
     /// ```
     pub fn with_templates_dir(dir: impl AsRef<Path>) -> Result<Self, tera::Error> {
         let dir = dir.as_ref();
-        let dir_str = dir.to_str()
+        let dir_str = dir
+            .to_str()
             .ok_or_else(|| tera::Error::msg("Invalid template directory path"))?;
         Ok(Self {
             tera: Tera::new(dir_str)?,
@@ -136,7 +136,10 @@ impl TemplateEngine {
     /// templates.insert("farewell".to_string(), "Goodbye {{ name }}!".to_string());
     /// engine.add_templates_map(templates).unwrap();
     /// ```
-    pub fn add_templates_map(&mut self, templates: HashMap<String, String>) -> Result<(), tera::Error> {
+    pub fn add_templates_map(
+        &mut self,
+        templates: HashMap<String, String>,
+    ) -> Result<(), tera::Error> {
         for (name, content) in templates {
             self.tera.add_raw_template(&name, &content)?;
         }
@@ -157,7 +160,11 @@ impl TemplateEngine {
     /// # let mut engine = TemplateEngine::new().unwrap();
     /// engine.load_from_file("my_prompt", "templates/my_prompt.tera").unwrap();
     /// ```
-    pub fn load_from_file(&mut self, name: &str, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
+    pub fn load_from_file(
+        &mut self,
+        name: &str,
+        path: impl AsRef<Path>,
+    ) -> Result<(), std::io::Error> {
         let content = std::fs::read_to_string(path)?;
         self.tera
             .add_raw_template(name, &content)
@@ -177,7 +184,8 @@ impl TemplateEngine {
     /// ```
     pub fn reload(&mut self) -> Result<(), tera::Error> {
         if let Some(dir) = &self.templates_dir {
-            let dir_str = dir.to_str()
+            let dir_str = dir
+                .to_str()
                 .ok_or_else(|| tera::Error::msg("Invalid template directory path"))?;
             self.tera = Tera::new(dir_str)?;
             info!("Reloaded templates from {:?}", dir);
@@ -263,7 +271,10 @@ impl TemplateEngine {
 
     /// Get all registered template names.
     pub fn template_names(&self) -> Vec<String> {
-        self.tera.get_template_names().map(|s| s.to_string()).collect()
+        self.tera
+            .get_template_names()
+            .map(|s| s.to_string())
+            .collect()
     }
 
     /// Validate a template without adding it.
@@ -285,7 +296,10 @@ impl TemplateEngine {
 
 impl Default for TemplateEngine {
     fn default() -> Self {
-        Self { tera: Tera::default(), templates_dir: None }
+        Self {
+            tera: Tera::default(),
+            templates_dir: None,
+        }
     }
 }
 
@@ -366,7 +380,10 @@ fn get_builtin_template(name: &str) -> Result<&'static str, tera::Error> {
         "agent_coder" => Ok(BUILTIN_AGENT_CODER),
         "agent_researcher" => Ok(BUILTIN_AGENT_RESEARCHER),
         "agent_writer" => Ok(BUILTIN_AGENT_WRITER),
-        _ => Err(tera::Error::msg(format!("Unknown built-in template: {}", name))),
+        _ => Err(tera::Error::msg(format!(
+            "Unknown built-in template: {}",
+            name
+        ))),
     }
 }
 
@@ -435,7 +452,10 @@ mod tests {
     fn test_loop() {
         let mut engine = TemplateEngine::new().unwrap();
         engine
-            .add_template("loop", "Items: {% for item in items %}{{ item }} {% endfor %}")
+            .add_template(
+                "loop",
+                "Items: {% for item in items %}{{ item }} {% endfor %}",
+            )
             .unwrap();
 
         let mut context = HashMap::new();
@@ -451,7 +471,10 @@ mod tests {
     fn test_loop_empty() {
         let mut engine = TemplateEngine::new().unwrap();
         engine
-            .add_template("loop", "{% for item in items %}{{ item }}{% else %}empty{% endfor %}")
+            .add_template(
+                "loop",
+                "{% for item in items %}{{ item }}{% else %}empty{% endfor %}",
+            )
             .unwrap();
 
         let mut context = HashMap::new();
@@ -465,7 +488,10 @@ mod tests {
     fn test_loop_with_index() {
         let mut engine = TemplateEngine::new().unwrap();
         engine
-            .add_template("loop", "{% for item in items %}{{ loop.index }}: {{ item }} {% endfor %}")
+            .add_template(
+                "loop",
+                "{% for item in items %}{{ loop.index }}: {{ item }} {% endfor %}",
+            )
             .unwrap();
 
         let mut context = HashMap::new();
@@ -620,7 +646,10 @@ mod tests {
 
         let result = engine.render_builtin("unknown_template", &context);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unknown built-in template"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown built-in template"));
     }
 
     #[test]
@@ -637,7 +666,10 @@ mod tests {
         context.insert("name".to_string(), json!("World"));
 
         assert_eq!(engine.render("greeting", &context).unwrap(), "Hello World!");
-        assert_eq!(engine.render("farewell", &context).unwrap(), "Goodbye World!");
+        assert_eq!(
+            engine.render("farewell", &context).unwrap(),
+            "Goodbye World!"
+        );
     }
 
     #[test]
@@ -679,7 +711,9 @@ mod tests {
     #[test]
     fn test_render_nested_objects() {
         let mut engine = TemplateEngine::new().unwrap();
-        engine.add_template("test", "User: {{ user.name }}").unwrap();
+        engine
+            .add_template("test", "User: {{ user.name }}")
+            .unwrap();
 
         let mut context = HashMap::new();
         context.insert("user".to_string(), json!({"name": "Alice"}));
@@ -709,7 +743,9 @@ mod tests {
     #[test]
     fn test_variable_interpolation_multiple() {
         let mut engine = TemplateEngine::new().unwrap();
-        engine.add_template("test", "{{ greeting }}, {{ name }}!").unwrap();
+        engine
+            .add_template("test", "{{ greeting }}, {{ name }}!")
+            .unwrap();
 
         let mut context = HashMap::new();
         context.insert("greeting".to_string(), json!("Hello"));

@@ -152,7 +152,8 @@ impl CodeExecConfig {
     fn validate_language(&self, lang: CodeLanguage) -> Result<(), ToolError> {
         if !self.enabled {
             return Err(ToolError::Execution(
-                "Code execution is disabled. Enable it with CodeExecConfig::enabled(true)".to_string(),
+                "Code execution is disabled. Enable it with CodeExecConfig::enabled(true)"
+                    .to_string(),
             ));
         }
 
@@ -231,7 +232,11 @@ impl CodeExec {
     }
 
     /// Execute code for a specific language.
-    async fn execute_code(&self, code: &str, language: CodeLanguage) -> Result<CodeExecResult, ToolError> {
+    async fn execute_code(
+        &self,
+        code: &str,
+        language: CodeLanguage,
+    ) -> Result<CodeExecResult, ToolError> {
         self.config.validate_language(language)?;
 
         debug!("Executing {} code", language.as_str());
@@ -294,7 +299,9 @@ impl CodeExec {
             .map_err(|e| ToolError::Execution(format!("Failed to write temp file: {}", e)))?;
 
         // Compile and run
-        let compile_result = self.run_command("rustc", &["-o", "/tmp/temp_exec", &temp_file]).await?;
+        let compile_result = self
+            .run_command("rustc", &["-o", "/tmp/temp_exec", &temp_file])
+            .await?;
 
         if compile_result.exit_code != 0 {
             return Ok(compile_result);
@@ -319,13 +326,7 @@ impl CodeExec {
     async fn run_command(&self, cmd: &str, args: &[&str]) -> Result<CodeExecResult, ToolError> {
         let duration = Duration::from_secs(self.config.timeout_secs);
 
-        let output = timeout(
-            duration,
-            Command::new(cmd)
-                .args(args)
-                .output()
-        )
-        .await;
+        let output = timeout(duration, Command::new(cmd).args(args).output()).await;
 
         match output {
             Ok(Ok(output)) => {
@@ -352,15 +353,19 @@ impl CodeExec {
                     timed_out: false,
                 })
             }
-            Ok(Err(e)) => {
-                Err(ToolError::Execution(format!("Failed to execute command: {}", e)))
-            }
+            Ok(Err(e)) => Err(ToolError::Execution(format!(
+                "Failed to execute command: {}",
+                e
+            ))),
             Err(_) => {
                 // Timeout
                 Ok(CodeExecResult {
                     exit_code: -1,
                     stdout: String::new(),
-                    stderr: format!("Execution timed out after {} seconds", self.config.timeout_secs),
+                    stderr: format!(
+                        "Execution timed out after {} seconds",
+                        self.config.timeout_secs
+                    ),
                     timed_out: true,
                 })
             }
@@ -415,11 +420,12 @@ impl Tool for CodeExec {
             return Ok(ToolOutput::error("Code cannot be empty"));
         }
 
-        let language = CodeLanguage::from_str(&input.language)
-            .ok_or_else(|| ToolError::InvalidInput(format!(
+        let language = CodeLanguage::from_str(&input.language).ok_or_else(|| {
+            ToolError::InvalidInput(format!(
                 "Unknown language: '{}'. Supported: python, javascript, ruby, go, rust, bash",
                 input.language
-            )))?;
+            ))
+        })?;
 
         let result = self.execute_code(&input.code, language).await?;
 
@@ -551,7 +557,8 @@ mod tests {
                 set
             },
             ..CodeExecConfig::default()
-        }.enabled(true);
+        }
+        .enabled(true);
 
         let tool = CodeExec::with_config(config);
 
@@ -572,9 +579,15 @@ mod tests {
     fn test_language_from_str() {
         assert_eq!(CodeLanguage::from_str("python"), Some(CodeLanguage::Python));
         assert_eq!(CodeLanguage::from_str("py"), Some(CodeLanguage::Python));
-        assert_eq!(CodeLanguage::from_str("javascript"), Some(CodeLanguage::JavaScript));
+        assert_eq!(
+            CodeLanguage::from_str("javascript"),
+            Some(CodeLanguage::JavaScript)
+        );
         assert_eq!(CodeLanguage::from_str("js"), Some(CodeLanguage::JavaScript));
-        assert_eq!(CodeLanguage::from_str("node"), Some(CodeLanguage::JavaScript));
+        assert_eq!(
+            CodeLanguage::from_str("node"),
+            Some(CodeLanguage::JavaScript)
+        );
         assert_eq!(CodeLanguage::from_str("ruby"), Some(CodeLanguage::Ruby));
         assert_eq!(CodeLanguage::from_str("go"), Some(CodeLanguage::Go));
         assert_eq!(CodeLanguage::from_str("rust"), Some(CodeLanguage::Rust));
@@ -603,7 +616,8 @@ mod tests {
                 set
             },
             ..CodeExecConfig::default()
-        }.enabled(true);
+        }
+        .enabled(true);
 
         assert!(config.validate_language(CodeLanguage::Python).is_ok());
         assert!(config.validate_language(CodeLanguage::JavaScript).is_ok());

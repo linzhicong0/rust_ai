@@ -116,7 +116,8 @@ impl HttpToolConfig {
 
         // If allowlist is configured, check it
         if !self.allowed_prefixes.is_empty() {
-            let allowed = self.allowed_prefixes
+            let allowed = self
+                .allowed_prefixes
                 .iter()
                 .any(|prefix| url.starts_with(prefix));
 
@@ -222,8 +223,7 @@ impl Tool for HttpFetch {
         if content_length > self.config.max_response_size as u64 {
             return Ok(ToolOutput::error(format!(
                 "Response too large: {} bytes (max: {} bytes)",
-                content_length,
-                self.config.max_response_size
+                content_length, self.config.max_response_size
             )));
         }
 
@@ -310,7 +310,8 @@ impl Tool for HttpHead {
 
         debug!("HEAD request to: {}", input.url);
 
-        let response = self.config
+        let response = self
+            .config
             .client
             .head(&input.url)
             .send()
@@ -322,9 +323,7 @@ impl Tool for HttpHead {
         let headers: Vec<String> = response
             .headers()
             .iter()
-            .map(|(name, value)| {
-                format!("{}: {}", name, value.to_str().unwrap_or("<binary>"))
-            })
+            .map(|(name, value)| format!("{}: {}", name, value.to_str().unwrap_or("<binary>")))
             .collect();
 
         let output = format!(
@@ -359,8 +358,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_http_fetch_blocked_url() {
-        let config = HttpToolConfig::default()
-            .block_prefix("https://blocked.com".to_string());
+        let config = HttpToolConfig::default().block_prefix("https://blocked.com".to_string());
         let tool = HttpFetch::with_config(config);
 
         let result = tool
@@ -372,8 +370,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_http_fetch_allowed_only() {
-        let config = HttpToolConfig::default()
-            .allow_prefix("https://httpbin.org".to_string());
+        let config = HttpToolConfig::default().allow_prefix("https://httpbin.org".to_string());
         let tool = HttpFetch::with_config(config.clone());
 
         // Allowed URL should work (or fail with network error, not blocked error)
@@ -386,9 +383,7 @@ mod tests {
         }
 
         // Non-allowed URL should be blocked
-        let result = tool
-            .execute(json!({"url": "https://example.com"}))
-            .await;
+        let result = tool.execute(json!({"url": "https://example.com"})).await;
 
         assert!(result.is_err());
     }
@@ -409,7 +404,9 @@ mod tests {
             let output = result.unwrap();
             assert!(!output.is_error);
             // The response should contain our custom header echoed back
-            assert!(output.content.contains("X-Custom-Header") || output.content.contains("Status:"));
+            assert!(
+                output.content.contains("X-Custom-Header") || output.content.contains("Status:")
+            );
         }
     }
 
@@ -431,9 +428,7 @@ mod tests {
     #[tokio::test]
     async fn test_http_fetch_invalid_url() {
         let tool = HttpFetch::new();
-        let result = tool
-            .execute(json!({"url": "not-a-valid-url"}))
-            .await;
+        let result = tool.execute(json!({"url": "not-a-valid-url"})).await;
 
         assert!(result.is_err());
     }
@@ -443,15 +438,11 @@ mod tests {
         let tool = HttpFetch::new();
 
         // localhost should be blocked by default
-        let result = tool
-            .execute(json!({"url": "http://localhost:8080"}))
-            .await;
+        let result = tool.execute(json!({"url": "http://localhost:8080"})).await;
 
         assert!(result.is_err());
 
-        let result = tool
-            .execute(json!({"url": "http://127.0.0.1:8080"}))
-            .await;
+        let result = tool.execute(json!({"url": "http://127.0.0.1:8080"})).await;
 
         assert!(result.is_err());
     }

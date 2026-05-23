@@ -26,26 +26,25 @@
 //! - [`memory`] — Memory storage and retrieval
 //! - [`agent`] — Agent definition and ReAct loop
 //! - [`pipeline`] — Workflow orchestration
+//! - [`plugin`] — Plugin lifecycle and registry
 //! - [`config`] — Framework configuration
 //! - [`error`] — Unified error types
 
 // Re-export core types at the crate root for convenience
 pub use crate::types::{
-    Content, ContentPart, CompletionResponse, FinishReason, ImageDetail, Message,
-    ModelConfig, Role, StreamChunk, ToolCall, ToolCallDelta, Usage,
-    AgentEvent, AgentOutput,
+    AgentEvent, AgentOutput, CompletionResponse, Content, ContentPart, FinishReason, ImageDetail,
+    Message, ModelConfig, Role, StreamChunk, ToolCall, ToolCallDelta, Usage,
 };
 
 // Re-export context management types
 pub use crate::context::{
-    ContextConfig, ContextManager, ContextResult, ContextUsage, TruncationStrategy, estimate_tokens,
+    estimate_tokens, ContextConfig, ContextManager, ContextResult, ContextUsage, TruncationStrategy,
 };
 
 // Re-export cost tracking types
 pub use crate::cost::{
-    agent_scope, new_request_id, project_scope, request_scope, workflow_scope,
-    CostAccumulator, CostSnapshot, CostTracker, ModelPricing, PricingTable,
-    GLOBAL_SCOPE,
+    agent_scope, new_request_id, project_scope, request_scope, workflow_scope, CostAccumulator,
+    CostSnapshot, CostTracker, ModelPricing, PricingTable, GLOBAL_SCOPE,
 };
 
 // Re-export model registry types
@@ -55,19 +54,20 @@ pub use crate::model_registry::{
 
 // Re-export prompt injection defense types
 pub use crate::prompt_injection::{
-    InjectionPattern, InjectionScanResult, LeakDetectionResult,
-    PromptInjectionDefender, global_defender, has_injection_attempts, has_prompt_leaks,
+    global_defender, has_injection_attempts, has_prompt_leaks, InjectionPattern,
+    InjectionScanResult, LeakDetectionResult, PromptInjectionDefender,
 };
 
 // Re-export core traits
-pub use crate::provider::Provider;
-pub use crate::tool::{Tool, ToolDescriptor, ToolOutput};
-pub use crate::memory::{Memory, MemoryEntry, ScopedMemory};
 pub use crate::embedder::Embedder;
 pub use crate::guardrail::{
-    Guardrail, GuardrailAction, GuardrailChain, RegexPiiDetector,
-    LengthLimiter, CustomGuardrail, PiiAction, PromptInjectionGuard
+    CustomGuardrail, Guardrail, GuardrailAction, GuardrailChain, LengthLimiter, PiiAction,
+    PromptInjectionGuard, RegexPiiDetector,
 };
+pub use crate::memory::{Memory, MemoryEntry, ScopedMemory};
+pub use crate::plugin::{Plugin, PluginError, PluginRegistry, PluginRequest, PluginResponse};
+pub use crate::provider::Provider;
+pub use crate::tool::{Tool, ToolDescriptor, ToolOutput};
 
 // Re-export configuration
 pub use crate::config::FrameworkConfig;
@@ -78,15 +78,17 @@ pub use crate::client::{Client, TrackedCompletionResponse};
 // Re-export errors — users typically import these via `use ai_core::Error`
 // or use specific error variants like `ProviderError`
 pub use crate::error::{
-    AgentError, EmbedderError, GuardrailError, MemoryError,
-    PipelineError, ProviderError, ToolError,
+    AgentError, EmbedderError, GuardrailError, MemoryError, PipelineError, ProviderError, ToolError,
 };
 
 // Re-export template engine
 pub use crate::template::TemplateEngine;
 
 // Re-export structured output
-pub use crate::structured::{StructuredOutputConfig, StructuredOutputValidator, complete_structured, extract_json, StructuredOutputError};
+pub use crate::structured::{
+    complete_structured, extract_json, StructuredOutputConfig, StructuredOutputError,
+    StructuredOutputValidator,
+};
 
 // Module declarations
 pub mod client;
@@ -98,6 +100,7 @@ pub mod error;
 pub mod guardrail;
 pub mod memory;
 pub mod model_registry;
+pub mod plugin;
 pub mod prompt_injection;
 pub mod provider;
 pub mod structured;
@@ -115,15 +118,15 @@ pub mod prelude {
 
     // Core types
     pub use crate::types::{
-        AgentEvent, AgentOutput, Content, ContentPart, Message,
-        ModelConfig, Role, CompletionResponse, Usage,
+        AgentEvent, AgentOutput, CompletionResponse, Content, ContentPart, Message, ModelConfig,
+        Role, Usage,
     };
 
     // Core traits
+    pub use crate::embedder::Embedder;
+    pub use crate::memory::{Memory, MemoryEntry, ScopedMemory};
     pub use crate::provider::Provider;
     pub use crate::tool::{Tool, ToolDescriptor};
-    pub use crate::memory::{Memory, MemoryEntry, ScopedMemory};
-    pub use crate::embedder::Embedder;
 
     // Configuration
     pub use crate::config::FrameworkConfig;
@@ -168,6 +171,10 @@ mod tests {
             completion_tokens: 50,
             total_tokens: 150,
         };
+        let _plugin_request = PluginRequest::new("gpt-4", vec![Message::user("test")]);
+        let _plugin_response = PluginResponse::new("ok", Usage::default());
+        let _plugin_error = PluginError::Lifecycle("test".to_string());
+        let _plugin: Option<Box<dyn Plugin>> = None;
 
         // Error types can be instantiated
         let _tool_err = ToolError::Execution("test".to_string());

@@ -142,11 +142,7 @@ pub trait Memory: Send + Sync {
 #[async_trait]
 pub trait ScopedMemory: Send + Sync {
     /// Add an entry to a specific scope.
-    async fn add_to_scope(
-        &self,
-        scope: &str,
-        entry: MemoryEntry,
-    ) -> Result<(), MemoryError>;
+    async fn add_to_scope(&self, scope: &str, entry: MemoryEntry) -> Result<(), MemoryError>;
 
     /// Retrieve entries from a specific scope.
     async fn get_from_scope(

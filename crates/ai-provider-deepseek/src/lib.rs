@@ -307,7 +307,11 @@ impl DeepSeekProvider {
                                 detail: detail.or(Some("auto".to_string())),
                             },
                         },
-                        ContentPart::ImageBytes { data, media_type, detail } => {
+                        ContentPart::ImageBytes {
+                            data,
+                            media_type,
+                            detail,
+                        } => {
                             use base64::prelude::*;
                             let base64 = BASE64_STANDARD.encode(&data);
                             let data_url = format!("data:{};base64,{}", media_type, base64);

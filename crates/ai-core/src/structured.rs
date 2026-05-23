@@ -62,10 +62,12 @@ impl StructuredOutputConfig {
 
     /// Build a system prompt that includes the JSON schema.
     pub fn build_system_prompt(&self, base_prompt: Option<&str>) -> String {
-        let schema_str = serde_json::to_string_pretty(&self.schema)
-            .unwrap_or_else(|_| "{}".to_string());
+        let schema_str =
+            serde_json::to_string_pretty(&self.schema).unwrap_or_else(|_| "{}".to_string());
 
-        let mut instructions = "You must respond with valid JSON that conforms to the following schema:\n\n".to_string();
+        let mut instructions =
+            "You must respond with valid JSON that conforms to the following schema:\n\n"
+                .to_string();
         instructions.push_str(&schema_str);
         instructions.push_str("\n\nRespond ONLY with the JSON object, no additional text.");
 
@@ -89,12 +91,16 @@ impl StructuredOutputValidator {
         let validator = Validator::new(&config.schema)
             .map_err(|e| StructuredOutputError::ValidationError(e.to_string()))?;
 
-        Ok(Self { schema: validator, config })
+        Ok(Self {
+            schema: validator,
+            config,
+        })
     }
 
     /// Validate a JSON response against the schema.
     pub fn validate(&self, response: &Value) -> Result<(), StructuredOutputError> {
-        self.schema.validate(response)
+        self.schema
+            .validate(response)
             .map_err(|e| StructuredOutputError::ValidationError(e.to_string()))
     }
 
@@ -227,8 +233,14 @@ pub async fn complete_structured<F>(
     mut complete_fn: F,
 ) -> Result<Value, StructuredOutputError>
 where
-    F: FnMut(String) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<String, Box<dyn std::error::Error + Send + Sync>>> + Send>,
+    F: FnMut(
+        String,
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<
+                    Output = Result<String, Box<dyn std::error::Error + Send + Sync>>,
+                > + Send,
+        >,
     >,
 {
     let base_prompt = validator.config().build_system_prompt(None);
@@ -391,9 +403,8 @@ mod tests {
             "properties": {"value": {"type": "number"}},
             "required": ["value"]
         });
-        let validator = StructuredOutputValidator::new(
-            StructuredOutputConfig::new(schema)
-        ).unwrap();
+        let validator =
+            StructuredOutputValidator::new(StructuredOutputConfig::new(schema)).unwrap();
 
         let result = complete_structured(&validator, |_prompt| {
             Box::pin(async move {
@@ -401,7 +412,8 @@ mod tests {
                     r#"{"value": 42}"#.to_string(),
                 )
             })
-        }).await;
+        })
+        .await;
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap()["value"], 42);
@@ -414,9 +426,9 @@ mod tests {
             "properties": {"value": {"type": "number"}},
             "required": ["value"]
         });
-        let validator = StructuredOutputValidator::new(
-            StructuredOutputConfig::new(schema).with_max_retries(2)
-        ).unwrap();
+        let validator =
+            StructuredOutputValidator::new(StructuredOutputConfig::new(schema).with_max_retries(2))
+                .unwrap();
 
         let call_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let call_count2 = call_count.clone();
@@ -425,15 +437,16 @@ mod tests {
             let n = call_count2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Box::pin(async move {
                 let response = if n == 0 {
-                    "not json at all".to_string()          // fail attempt 0
+                    "not json at all".to_string() // fail attempt 0
                 } else if n == 1 {
                     r#"{"value": "wrong type"}"#.to_string() // fail attempt 1
                 } else {
-                    r#"{"value": 99}"#.to_string()          // succeed attempt 2
+                    r#"{"value": 99}"#.to_string() // succeed attempt 2
                 };
                 Ok::<String, Box<dyn std::error::Error + Send + Sync>>(response)
             })
-        }).await;
+        })
+        .await;
 
         assert!(result.is_ok(), "Expected Ok, got {result:?}");
         assert_eq!(result.unwrap()["value"], 99);
@@ -447,17 +460,16 @@ mod tests {
             "properties": {"value": {"type": "number"}},
             "required": ["value"]
         });
-        let validator = StructuredOutputValidator::new(
-            StructuredOutputConfig::new(schema).with_max_retries(1)
-        ).unwrap();
+        let validator =
+            StructuredOutputValidator::new(StructuredOutputConfig::new(schema).with_max_retries(1))
+                .unwrap();
 
         let result = complete_structured(&validator, |_prompt| {
             Box::pin(async move {
-                Ok::<String, Box<dyn std::error::Error + Send + Sync>>(
-                    "still not json".to_string(),
-                )
+                Ok::<String, Box<dyn std::error::Error + Send + Sync>>("still not json".to_string())
             })
-        }).await;
+        })
+        .await;
 
         assert!(matches!(
             result,
@@ -699,8 +711,10 @@ Second: {"b": 2}"#;
         // The jsonschema crate may accept or reject this depending on version
         // Just check that we can handle the result
         match result {
-            Ok(_) => {}, // Schema was accepted
-            Err(e) => assert!(e.to_string().contains("validation") || e.to_string().contains("Schema")),
+            Ok(_) => {} // Schema was accepted
+            Err(e) => {
+                assert!(e.to_string().contains("validation") || e.to_string().contains("Schema"))
+            }
         }
     }
 }

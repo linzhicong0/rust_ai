@@ -163,10 +163,7 @@ where
         }
     }
 
-    fn aggregate_results(
-        &self,
-        results: Vec<(&DelegationWorker<P, M>, ToolOutput)>,
-    ) -> ToolOutput {
+    fn aggregate_results(&self, results: Vec<(&DelegationWorker<P, M>, ToolOutput)>) -> ToolOutput {
         if results.len() == 1 {
             return results.into_iter().next().unwrap().1;
         }
@@ -179,9 +176,7 @@ where
             }
             lines.push(format!(
                 "{} ({})\n{}",
-                worker.name,
-                worker.description,
-                output.content
+                worker.name, worker.description, output.content
             ));
         }
 
@@ -252,7 +247,9 @@ where
 mod tests {
     use super::*;
     use ai_core::tool::{Tool, ToolDescriptor};
-    use ai_core::types::{CompletionResponse, FinishReason, Message, ModelConfig, StreamChunk, Usage};
+    use ai_core::types::{
+        CompletionResponse, FinishReason, Message, ModelConfig, StreamChunk, Usage,
+    };
     use ai_memory::InMemoryMemory;
 
     struct MockProvider {
@@ -284,11 +281,15 @@ mod tests {
             _messages: Vec<Message>,
             _config: &ModelConfig,
             _tools: &[ToolDescriptor],
-        ) -> futures::stream::BoxStream<'static, Result<StreamChunk, ai_core::error::ProviderError>> {
+        ) -> futures::stream::BoxStream<'static, Result<StreamChunk, ai_core::error::ProviderError>>
+        {
             Box::pin(futures::stream::empty())
         }
 
-        async fn embed(&self, _texts: Vec<String>) -> Result<Vec<Vec<f32>>, ai_core::error::ProviderError> {
+        async fn embed(
+            &self,
+            _texts: Vec<String>,
+        ) -> Result<Vec<Vec<f32>>, ai_core::error::ProviderError> {
             Ok(vec![vec![0.0; 10]])
         }
 
@@ -321,11 +322,7 @@ mod tests {
 
     #[test]
     fn test_delegate_tool_descriptor() {
-        let delegate_tool = DelegateTool::new(
-            "delegate",
-            "Description",
-            worker_agent("Response"),
-        );
+        let delegate_tool = DelegateTool::new("delegate", "Description", worker_agent("Response"));
 
         let descriptor = delegate_tool.descriptor();
 
@@ -355,11 +352,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delegate_tool_execute_missing_task() {
-        let delegate_tool = DelegateTool::new(
-            "delegate",
-            "Worker agent",
-            worker_agent("Response"),
-        );
+        let delegate_tool = DelegateTool::new("delegate", "Worker agent", worker_agent("Response"));
 
         let input = serde_json::json!({});
         let result = delegate_tool.execute(input).await;
@@ -379,8 +372,16 @@ mod tests {
             "delegate",
             "Worker pool",
             vec![
-                DelegationWorker::new("researcher", "Research specialist", worker_agent("Research findings")),
-                DelegationWorker::new("reviewer", "Review specialist", worker_agent("Review complete")),
+                DelegationWorker::new(
+                    "researcher",
+                    "Research specialist",
+                    worker_agent("Research findings"),
+                ),
+                DelegationWorker::new(
+                    "reviewer",
+                    "Review specialist",
+                    worker_agent("Review complete"),
+                ),
             ],
         );
 
@@ -399,8 +400,16 @@ mod tests {
             "delegate",
             "Parallel worker pool",
             vec![
-                DelegationWorker::new("researcher", "Research specialist", worker_agent("Collected sources")),
-                DelegationWorker::new("reviewer", "Review specialist", worker_agent("Reviewed draft")),
+                DelegationWorker::new(
+                    "researcher",
+                    "Research specialist",
+                    worker_agent("Collected sources"),
+                ),
+                DelegationWorker::new(
+                    "reviewer",
+                    "Review specialist",
+                    worker_agent("Reviewed draft"),
+                ),
             ],
         );
 

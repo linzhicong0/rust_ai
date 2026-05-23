@@ -163,7 +163,10 @@ impl ContextUsage {
 #[derive(Debug)]
 pub enum ContextResult {
     /// Context is within limits and unchanged.
-    Ok { messages: Vec<Message>, usage: ContextUsage },
+    Ok {
+        messages: Vec<Message>,
+        usage: ContextUsage,
+    },
 
     /// Context was truncated to fit within limits.
     Truncated {
@@ -203,10 +206,8 @@ impl ContextManager {
 
     /// Analyze a set of messages and return usage information.
     pub fn analyze(&self, messages: &[Message]) -> ContextUsage {
-        let tokens_per_message: Vec<usize> = messages
-            .iter()
-            .map(|msg| estimate_tokens(msg))
-            .collect();
+        let tokens_per_message: Vec<usize> =
+            messages.iter().map(|msg| estimate_tokens(msg)).collect();
 
         let total_tokens: usize = tokens_per_message.iter().sum();
 
@@ -238,15 +239,11 @@ impl ContextManager {
 
         match self.config.truncation_strategy {
             TruncationStrategy::Error => ContextResult::ExceededLimit { usage },
-            TruncationStrategy::TruncateOldest => {
-                self.truncate_oldest(messages, &usage)
-            }
+            TruncationStrategy::TruncateOldest => self.truncate_oldest(messages, &usage),
             TruncationStrategy::SlidingWindow { keep_last_n } => {
                 self.sliding_window(messages, keep_last_n)
             }
-            TruncationStrategy::PrioritizeSystem => {
-                self.prioritize_system(messages, &usage)
-            }
+            TruncationStrategy::PrioritizeSystem => self.prioritize_system(messages, &usage),
         }
     }
 
@@ -337,7 +334,9 @@ impl ContextManager {
         }
 
         // Remove oldest non-system messages until we fit
-        while Self::estimate_messages_tokens(&system_messages, &other_messages) > self.config.max_tokens {
+        while Self::estimate_messages_tokens(&system_messages, &other_messages)
+            > self.config.max_tokens
+        {
             if other_messages.pop_front().is_none() {
                 break;
             }
@@ -399,8 +398,8 @@ pub fn estimate_tokens(message: &Message) -> usize {
                     crate::types::ContentPart::Text(text) => {
                         tokens += (text.chars().count() / 4).max(1);
                     }
-                    crate::types::ContentPart::Image { detail, .. } |
-                    crate::types::ContentPart::ImageBytes { detail, .. } => {
+                    crate::types::ContentPart::Image { detail, .. }
+                    | crate::types::ContentPart::ImageBytes { detail, .. } => {
                         // Vision models use different token accounting for images
                         // GPT-4 Vision: ~85 tokens for low detail, ~170+ for high detail
                         match detail.as_deref() {
@@ -425,7 +424,10 @@ mod tests {
     fn test_context_config_default() {
         let config = ContextConfig::default();
         assert_eq!(config.max_tokens, DEFAULT_CONTEXT_WINDOW);
-        assert_eq!(config.truncation_strategy, TruncationStrategy::TruncateOldest);
+        assert_eq!(
+            config.truncation_strategy,
+            TruncationStrategy::TruncateOldest
+        );
         assert!(config.warn_on_approach);
         assert_eq!(config.warning_threshold, WARNING_THRESHOLD_PCT);
     }
@@ -523,9 +525,9 @@ mod tests {
     fn test_context_manager_analyze_exceeds_limit() {
         let manager = ContextManager::with_max_tokens(10);
 
-        let messages = vec![
-            Message::user("This is a relatively long message that exceeds the tiny limit"),
-        ];
+        let messages = vec![Message::user(
+            "This is a relatively long message that exceeds the tiny limit",
+        )];
 
         let usage = manager.analyze(&messages);
 
@@ -607,8 +609,7 @@ mod tests {
     #[test]
     fn test_context_manager_truncate_oldest() {
         let manager = ContextManager::new(
-            ContextConfig::new(100)
-                .with_truncation_strategy(TruncationStrategy::TruncateOldest)
+            ContextConfig::new(100).with_truncation_strategy(TruncationStrategy::TruncateOldest),
         );
 
         let messages = vec![
@@ -641,7 +642,9 @@ mod tests {
                 .with_truncation_strategy(TruncationStrategy::SlidingWindow { keep_last_n: 2 })
         );
 
-        let long_text = "This is a longer message that uses more tokens to ensure truncation occurs. ".repeat(5);
+        let long_text =
+            "This is a longer message that uses more tokens to ensure truncation occurs. "
+                .repeat(5);
         let messages = vec![
             Message::system("System prompt"),
             Message::user(&format!("Message 1: {}", long_text)),
@@ -665,13 +668,12 @@ mod tests {
     #[test]
     fn test_context_manager_error_strategy() {
         let manager = ContextManager::new(
-            ContextConfig::new(10)
-                .with_truncation_strategy(TruncationStrategy::Error)
+            ContextConfig::new(10).with_truncation_strategy(TruncationStrategy::Error),
         );
 
-        let messages = vec![
-            Message::user(&"This is a long message that exceeds the limit ".repeat(10)),
-        ];
+        let messages = vec![Message::user(
+            &"This is a long message that exceeds the limit ".repeat(10),
+        )];
 
         match manager.manage(messages) {
             ContextResult::ExceededLimit { usage } => {
@@ -686,12 +688,12 @@ mod tests {
         let manager = ContextManager::new(
             ContextConfig::new(100)
                 .with_warnings(true)
-                .with_warning_threshold(0.5)
+                .with_warning_threshold(0.5),
         );
 
-        let messages = vec![
-            Message::user(&"This message uses about 60 tokens worth of text content ".repeat(5)),
-        ];
+        let messages = vec![Message::user(
+            &"This message uses about 60 tokens worth of text content ".repeat(5),
+        )];
 
         let usage = manager.analyze(&messages);
         assert!(usage.approaching_warning);
@@ -700,8 +702,7 @@ mod tests {
     #[test]
     fn test_prioritize_system_preserves_system_messages() {
         let manager = ContextManager::new(
-            ContextConfig::new(100)
-                .with_truncation_strategy(TruncationStrategy::PrioritizeSystem)
+            ContextConfig::new(100).with_truncation_strategy(TruncationStrategy::PrioritizeSystem),
         );
 
         let messages = vec![
@@ -737,9 +738,8 @@ mod tests {
             TruncationStrategy::SlidingWindow { keep_last_n: 1 },
             TruncationStrategy::PrioritizeSystem,
         ] {
-            let manager = ContextManager::new(
-                ContextConfig::new(10).with_truncation_strategy(strategy)
-            );
+            let manager =
+                ContextManager::new(ContextConfig::new(10).with_truncation_strategy(strategy));
 
             match manager.manage(messages.clone()) {
                 ContextResult::Ok { messages, .. } | ContextResult::Truncated { messages, .. } => {
@@ -765,7 +765,7 @@ mod tests {
         let msg = Message::user_with_image(
             "What's in this image?",
             "https://example.com/image.jpg",
-            "image/jpeg"
+            "image/jpeg",
         );
 
         let tokens = estimate_tokens(&msg);

@@ -27,9 +27,9 @@
 //! );
 //! ```
 
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::RwLock;
-use once_cell::sync::Lazy;
 
 /// Capabilities that a model may support.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -143,7 +143,9 @@ impl ModelInfo {
 
     /// Calculate cost for a given usage.
     pub fn calculate_cost(&self, input_tokens: u32, output_tokens: u32) -> Option<f64> {
-        self.cost.as_ref().map(|cost| cost.calculate_cost(input_tokens, output_tokens))
+        self.cost
+            .as_ref()
+            .map(|cost| cost.calculate_cost(input_tokens, output_tokens))
     }
 }
 
