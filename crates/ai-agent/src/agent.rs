@@ -8,16 +8,18 @@
 use std::sync::Arc;
 
 use futures::stream::{BoxStream, StreamExt};
-use futures::TryStreamExt;
+use serde_json::json;
+use tracing::Instrument;
 
 use ai_core::error::AgentError;
 use ai_core::memory::{Memory, MemoryEntry};
 use ai_core::provider::Provider;
-use ai_core::tool::{Tool, ToolDescriptor, ToolOutput};
+use ai_core::tool::{Tool, ToolDescriptor};
 use ai_core::types::{
-    AgentEvent, AgentOutput, CompletionResponse, Content, FinishReason, Message,
-    ModelConfig, Role, StreamChunk, ToolCall, Usage,
+    AgentEvent, AgentOutput, CompletionResponse, Content, FinishReason, Message, ModelConfig, Role,
+    ToolCall, Usage,
 };
+use ai_core::{agent_scope, new_request_id, request_scope, CostTracker, GLOBAL_SCOPE};
 
 // AgentInner is defined below in this module
 
@@ -29,12 +31,14 @@ where
 {
     pub(crate) provider: P,
     pub(crate) memory: M,
+    pub(crate) name: Option<String>,
     pub(crate) role: Option<String>,
     pub(crate) goal: Option<String>,
     pub(crate) backstory: Option<String>,
     pub(crate) tools: Vec<Box<dyn Tool>>,
     pub(crate) model_config: ModelConfig,
     pub(crate) max_iterations: u32,
+    pub(crate) cost_tracker: CostTracker,
 }
 
 // Implement Clone for AgentInner where both P and M are Clone
@@ -48,12 +52,14 @@ where
         Self {
             provider: self.provider.clone(),
             memory: self.memory.clone(),
+            name: self.name.clone(),
             role: self.role.clone(),
             goal: self.goal.clone(),
             backstory: self.backstory.clone(),
             tools: Vec::new(), // Tools need to be re-added after clone
             model_config: self.model_config.clone(),
             max_iterations: self.max_iterations,
+            cost_tracker: self.cost_tracker.clone(),
         }
     }
 }
@@ -126,6 +132,11 @@ where
         &self.inner.memory
     }
 
+    /// Get the agent name used for tracking.
+    pub fn name(&self) -> Option<&str> {
+        self.inner.name.as_deref()
+    }
+
     /// Get the agent's role description.
     pub fn role(&self) -> Option<&str> {
         self.inner.role.as_deref()
@@ -143,11 +154,7 @@ where
 
     /// Get the tool descriptors for all registered tools.
     pub fn tool_descriptors(&self) -> Vec<ToolDescriptor> {
-        self.inner
-            .tools
-            .iter()
-            .map(|t| t.descriptor())
-            .collect()
+        self.inner.tools.iter().map(|t| t.descriptor()).collect()
     }
 
     /// Get the model config for this agent.
@@ -158,6 +165,11 @@ where
     /// Get the maximum iterations before giving up.
     pub fn max_iterations(&self) -> u32 {
         self.inner.max_iterations
+    }
+
+    /// Get the cost tracker for this agent.
+    pub fn cost_tracker(&self) -> &CostTracker {
+        &self.inner.cost_tracker
     }
 
     /// Run the agent with the given input.
@@ -177,24 +189,55 @@ where
     pub async fn run(&self, input: impl Into<String>) -> Result<AgentOutput, AgentError> {
         let input = input.into();
         let mut messages = self.build_initial_messages(&input).await?;
+        self.store_user_input(&input).await;
+        let agent_scope_name = self.agent_scope_name();
+        let mut total_usage = Usage::default();
+        let mut total_cost = 0.0;
+        let mut tracked_scopes = vec![agent_scope_name.clone(), GLOBAL_SCOPE.to_string()];
 
         for iteration in 0..self.inner.max_iterations {
-            tracing::debug!(
-                agent = self.inner.role.as_deref().unwrap_or("unnamed"),
+            let agent_name = self.name().unwrap_or("unnamed");
+            let turn_span = tracing::info_span!(
+                "agent_turn",
+                agent = agent_name,
                 iteration,
-                "Agent ReAct loop"
             );
 
-            // Get response from provider
-            let response = self
+            let response = async {
+                tracing::debug!(agent = agent_name, iteration, "Agent ReAct loop");
+
+                self.inner
+                    .provider
+                    .complete(
+                        messages.clone(),
+                        &self.inner.model_config,
+                        &self.tool_descriptors(),
+                    )
+                    .instrument(tracing::debug_span!(
+                        "llm_call",
+                        agent = agent_name,
+                        iteration,
+                        model = %self.inner.model_config.model,
+                    ))
+                    .await
+            }
+            .instrument(turn_span)
+            .await?;
+
+            let request_scope_name = self.track_response_cost(&response, &agent_scope_name).await;
+            if !tracked_scopes
+                .iter()
+                .any(|scope| scope == &request_scope_name)
+            {
+                tracked_scopes.push(request_scope_name);
+            }
+            total_usage.prompt_tokens += response.usage.prompt_tokens;
+            total_usage.completion_tokens += response.usage.completion_tokens;
+            total_usage.total_tokens += response.usage.total_tokens;
+            total_cost += self
                 .inner
-                .provider
-                .complete(
-                    messages.clone(),
-                    &self.inner.model_config,
-                    &self.tool_descriptors(),
-                )
-                .await?;
+                .cost_tracker
+                .estimate_cost(&self.inner.model_config.model, &response.usage);
 
             // Store assistant response in memory
             self.store_assistant_response(&response, iteration).await;
@@ -203,12 +246,16 @@ where
                 // No tool calls — agent is done
                 return Ok(AgentOutput {
                     content: response.content,
+                    usage: total_usage,
+                    estimated_cost: total_cost,
+                    tracked_scopes,
                 });
             }
 
             // Execute tool calls
             for tool_call in &response.tool_calls {
                 let tool_result = self.execute_tool_call(tool_call).await?;
+                self.store_tool_result(tool_call, &tool_result).await;
 
                 // Add tool result to messages
                 messages.push(Message {
@@ -231,14 +278,25 @@ where
     /// # Arguments
     ///
     /// * `input` — The user input or task description
-    pub fn stream(&self, input: impl Into<String>) -> BoxStream<'static, Result<AgentEvent, AgentError>> {
+    pub fn stream(
+        &self,
+        input: impl Into<String>,
+    ) -> BoxStream<'static, Result<AgentEvent, AgentError>> {
         let input = input.into();
         let agent = self.clone();
 
         Box::pin(async_stream::try_stream! {
             let mut messages = agent.build_initial_messages(&input).await?;
+            agent.store_user_input(&input).await;
 
-            for _iteration in 0..agent.inner.max_iterations {
+            for iteration in 0..agent.inner.max_iterations {
+                let agent_name = agent.name().unwrap_or("unnamed").to_string();
+                let stream_span = tracing::info_span!(
+                    "agent_turn_stream",
+                    agent = %agent_name,
+                    iteration,
+                    model = %agent.inner.model_config.model,
+                );
                 let mut stream = agent.inner.provider.stream(
                     messages.clone(),
                     &agent.inner.model_config,
@@ -248,7 +306,7 @@ where
                 let mut content_buffer = String::new();
                 let tool_calls_buffer: Vec<ToolCall> = Vec::new();
 
-                while let Some(chunk_result) = stream.next().await {
+                while let Some(chunk_result) = stream.next().instrument(stream_span.clone()).await {
                     let chunk = chunk_result?;
 
                     if let Some(delta) = chunk.delta {
@@ -273,6 +331,7 @@ where
                     yield AgentEvent::ToolCall(tool_call.clone());
 
                     let result = agent.execute_tool_call(tool_call).await?;
+                    agent.store_tool_result(tool_call, &result).await;
                     yield AgentEvent::ToolResult {
                         call_id: tool_call.id.clone(),
                         content: result.clone(),
@@ -296,20 +355,57 @@ where
             messages.push(Message::system(system_prompt));
         }
 
+        let history = self.inner.memory.get(None).await.unwrap_or_default();
+        if let Some(relevant_memory_prompt) = self.relevant_memory_prompt(input, &history).await {
+            messages.push(Message::system(relevant_memory_prompt));
+        }
+
         // Get conversation history from memory
-        if let Ok(history) = self.inner.memory.get(None).await {
-            for entry in history {
-                messages.push(Message {
-                    role: entry.role,
-                    content: Content::Text(entry.content),
-                });
-            }
+        for entry in history {
+            messages.push(Message {
+                role: entry.role,
+                content: Content::Text(entry.content),
+            });
         }
 
         // Add current user input
         messages.push(Message::user(input));
 
         Ok(messages)
+    }
+
+    async fn relevant_memory_prompt(&self, input: &str, history: &[MemoryEntry]) -> Option<String> {
+        let relevant_memories = self.inner.memory.search(input, 3).await.ok()?;
+        let filtered: Vec<_> = relevant_memories
+            .into_iter()
+            .filter(|candidate| {
+                !history.iter().any(|entry| {
+                    std::mem::discriminant(&entry.role) == std::mem::discriminant(&candidate.role)
+                        && entry.content == candidate.content
+                })
+            })
+            .collect();
+
+        if filtered.is_empty() {
+            return None;
+        }
+
+        let mut prompt = String::from("Relevant memory for this task:\n");
+        for entry in filtered {
+            let label = entry
+                .metadata
+                .get("knowledge_key")
+                .and_then(|value| value.as_str())
+                .map(|value| format!("knowledge:{value}"))
+                .unwrap_or_else(|| Self::role_label(&entry.role).to_string());
+            prompt.push_str("- ");
+            prompt.push_str(&label);
+            prompt.push_str(": ");
+            prompt.push_str(&entry.content);
+            prompt.push('\n');
+        }
+
+        Some(prompt.trim_end().to_string())
     }
 
     /// Build the system prompt from agent configuration.
@@ -329,10 +425,68 @@ where
         }
     }
 
-    /// Store the assistant's response in memory.
-    async fn store_assistant_response(&self, response: &CompletionResponse, _iteration: u32) {
-        let entry = MemoryEntry::new(Role::Assistant, &response.content);
+    fn role_label(role: &Role) -> &'static str {
+        match role {
+            Role::System => "system",
+            Role::User => "user",
+            Role::Assistant => "assistant",
+            Role::Tool => "tool",
+        }
+    }
+
+    async fn store_user_input(&self, input: &str) {
+        let entry = MemoryEntry::user(input).with_metadata("memory_kind", json!("conversation"));
         let _ = self.inner.memory.add(entry).await;
+    }
+
+    /// Store the assistant's response in memory.
+    async fn store_assistant_response(&self, response: &CompletionResponse, iteration: u32) {
+        let entry = MemoryEntry::assistant(&response.content)
+            .with_metadata("memory_kind", json!("conversation"))
+            .with_metadata("iteration", json!(iteration));
+        let _ = self.inner.memory.add(entry).await;
+    }
+
+    async fn store_tool_result(&self, tool_call: &ToolCall, result: &str) {
+        let entry = MemoryEntry::new(Role::Tool, result)
+            .with_metadata("memory_kind", json!("tool_result"))
+            .with_metadata("tool_call_id", json!(tool_call.id.clone()))
+            .with_metadata("tool_name", json!(tool_call.name.clone()));
+        let _ = self.inner.memory.add(entry).await;
+    }
+
+    fn agent_scope_name(&self) -> String {
+        let name = self
+            .inner
+            .name
+            .as_deref()
+            .or(self.inner.role.as_deref())
+            .unwrap_or("unnamed");
+        agent_scope(name)
+    }
+
+    async fn track_response_cost(
+        &self,
+        response: &CompletionResponse,
+        agent_scope_name: &str,
+    ) -> String {
+        let request_id = new_request_id();
+        let request_scope_name = request_scope(&request_id);
+
+        self.inner
+            .cost_tracker
+            .record_many(
+                [
+                    request_scope_name.clone(),
+                    agent_scope_name.to_string(),
+                    GLOBAL_SCOPE.to_string(),
+                ],
+                &self.inner.model_config.model,
+                &response.usage,
+            )
+            .await;
+
+        request_scope_name
     }
 
     /// Execute a single tool call.
@@ -344,7 +498,15 @@ where
             .find(|t| t.descriptor().name == tool_call.name)
             .ok_or_else(|| AgentError::ToolNotFound(tool_call.name.clone()))?;
 
-        let output = tool.execute(tool_call.arguments.clone()).await?;
+        let output = tool
+            .execute(tool_call.arguments.clone())
+            .instrument(tracing::info_span!(
+                "tool_execution",
+                agent = self.name().unwrap_or("unnamed"),
+                tool = %tool_call.name,
+                call_id = %tool_call.id,
+            ))
+            .await?;
 
         Ok(if output.is_error {
             format!("Error: {}", output.content)
@@ -370,19 +532,22 @@ where
     {
         let mut inner = (*self.inner).clone();
         inner.tools.push(Box::new(tool));
-        Agent { inner: Arc::new(inner) }
+        Agent {
+            inner: Arc::new(inner),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::builder::AgentBuilder;
-    use ai_core::error::{ProviderError, ToolError};
+    use super::*;
+    use ai_core::error::ProviderError;
     use ai_core::tool::{ToolDescriptor, ToolOutput};
-    use ai_core::types::{FinishReason, Message, Role, ToolCall, Usage};
-    use ai_memory::InMemoryMemory;
+    use ai_core::types::{FinishReason, Message, Role, StreamChunk, ToolCall, Usage};
+    use ai_memory::{AgentMemory, InMemoryMemory};
     use serde_json::json;
+    use std::sync::{Arc, Mutex};
 
     // Mock tool for testing
     struct MockTool {
@@ -400,7 +565,10 @@ mod tests {
             )
         }
 
-        async fn execute(&self, _input: serde_json::Value) -> Result<ToolOutput, ai_core::error::ToolError> {
+        async fn execute(
+            &self,
+            _input: serde_json::Value,
+        ) -> Result<ToolOutput, ai_core::error::ToolError> {
             Ok(ToolOutput::success(self.response.clone()))
         }
     }
@@ -480,6 +648,7 @@ mod tests {
 
         AgentBuilder::new(memory)
             .provider(provider)
+            .name("helper")
             .role("You are a helpful assistant.")
             .goal("Help users with their questions.")
             .backstory("You are an AI with general knowledge.")
@@ -493,7 +662,11 @@ mod tests {
 
         assert_eq!(agent.role(), Some("You are a helpful assistant."));
         assert_eq!(agent.goal(), Some("Help users with their questions."));
-        assert_eq!(agent.backstory(), Some("You are an AI with general knowledge."));
+        assert_eq!(
+            agent.backstory(),
+            Some("You are an AI with general knowledge.")
+        );
+        assert_eq!(agent.name(), Some("helper"));
         assert_eq!(agent.max_iterations(), 10);
         assert_eq!(agent.model_config().model, "gpt-4");
     }
@@ -549,6 +722,97 @@ mod tests {
         let result = agent.run("Hello!").await.unwrap();
 
         assert_eq!(result.content, "Hello! How can I help?");
+        assert_eq!(result.usage.prompt_tokens, 10);
+        assert_eq!(result.usage.completion_tokens, 5);
+        assert!(result.estimated_cost > 0.0);
+        assert!(result.tracked_scopes.contains(&"agent:helper".to_string()));
+        assert!(result.tracked_scopes.contains(&GLOBAL_SCOPE.to_string()));
+
+        let memory_entries = agent.memory().get(None).await.unwrap();
+        assert_eq!(memory_entries.len(), 2);
+        assert!(matches!(memory_entries[0].role, Role::User));
+        assert!(matches!(memory_entries[1].role, Role::Assistant));
+    }
+
+    #[derive(Clone)]
+    struct InspectingProvider {
+        seen_messages: Arc<Mutex<Vec<Message>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl Provider for InspectingProvider {
+        async fn complete(
+            &self,
+            messages: Vec<Message>,
+            _config: &ModelConfig,
+            _tools: &[ToolDescriptor],
+        ) -> Result<CompletionResponse, ProviderError> {
+            *self.seen_messages.lock().unwrap() = messages;
+            Ok(CompletionResponse {
+                content: "Memory-aware response".to_string(),
+                tool_calls: vec![],
+                usage: Usage {
+                    prompt_tokens: 12,
+                    completion_tokens: 6,
+                    total_tokens: 18,
+                },
+                finish_reason: FinishReason::Stop,
+            })
+        }
+
+        fn stream(
+            &self,
+            _messages: Vec<Message>,
+            _config: &ModelConfig,
+            _tools: &[ToolDescriptor],
+        ) -> BoxStream<'static, Result<StreamChunk, ProviderError>> {
+            Box::pin(futures::stream::empty())
+        }
+
+        async fn embed(&self, _texts: Vec<String>) -> Result<Vec<Vec<f32>>, ProviderError> {
+            Ok(vec![vec![0.0; 8]])
+        }
+
+        fn name(&self) -> &str {
+            "inspecting"
+        }
+    }
+
+    #[tokio::test]
+    async fn test_agent_injects_relevant_memory_prompt() {
+        let memory = AgentMemory::new(10);
+        memory
+            .remember(
+                "favorite_language",
+                "The user prefers Rust for systems and CLI work.",
+            )
+            .unwrap();
+
+        let seen_messages = Arc::new(Mutex::new(Vec::new()));
+        let provider = InspectingProvider {
+            seen_messages: seen_messages.clone(),
+        };
+
+        let agent = AgentBuilder::new(memory)
+            .provider(provider)
+            .role("You are a helpful assistant.")
+            .build()
+            .unwrap();
+
+        agent
+            .run("What language does the user usually prefer for systems work?")
+            .await
+            .unwrap();
+
+        let messages = seen_messages.lock().unwrap().clone();
+        assert!(messages.iter().any(|message| {
+            matches!(message.role, Role::System)
+                && message
+                    .content
+                    .as_text()
+                    .unwrap_or_default()
+                    .contains("favorite_language")
+        }));
     }
 
     #[tokio::test]
@@ -663,7 +927,29 @@ mod tests {
         let result = agent.run("What's the weather in SF?").await.unwrap();
 
         assert!(result.content.contains("72°F"));
+        assert_eq!(result.usage.prompt_tokens, 30);
+        assert_eq!(result.usage.completion_tokens, 15);
         assert_eq!(*provider_calls.lock().unwrap(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_agent_cost_tracker_records_agent_and_global_scopes() {
+        let agent = create_test_agent();
+
+        let result = agent.run("Track this").await.unwrap();
+
+        let agent_snapshot = agent.cost_tracker().get("agent:helper").await;
+        assert_eq!(agent_snapshot.request_count, 1);
+        assert_eq!(agent_snapshot.prompt_tokens, 10);
+
+        let global_snapshot = agent.cost_tracker().get(GLOBAL_SCOPE).await;
+        assert_eq!(global_snapshot.request_count, 1);
+        assert_eq!(global_snapshot.completion_tokens, 5);
+
+        assert!(result
+            .tracked_scopes
+            .iter()
+            .any(|scope| scope.starts_with("request:")));
     }
 
     #[tokio::test]

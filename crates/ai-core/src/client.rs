@@ -29,10 +29,27 @@ use std::sync::Arc;
 
 use futures::stream::BoxStream;
 
+use crate::cost::{new_request_id, request_scope, CostTracker, GLOBAL_SCOPE};
 use crate::error::ProviderError;
 use crate::provider::Provider;
 use crate::tool::ToolDescriptor;
 use crate::types::{CompletionResponse, Message, ModelConfig, StreamChunk};
+
+/// Completion response enriched with cost-tracking metadata.
+#[derive(Debug)]
+pub struct TrackedCompletionResponse {
+    /// The provider response.
+    pub response: CompletionResponse,
+
+    /// Generated request identifier used for request-scoped accounting.
+    pub request_id: String,
+
+    /// All scopes updated for this completion.
+    pub tracked_scopes: Vec<String>,
+
+    /// Estimated cost in USD for this completion.
+    pub estimated_cost: f64,
+}
 
 /// The top-level client for LLM interaction.
 ///
@@ -49,6 +66,7 @@ use crate::types::{CompletionResponse, Message, ModelConfig, StreamChunk};
 pub struct Client<P: Provider> {
     provider: Arc<P>,
     default_config: ModelConfig,
+    cost_tracker: CostTracker,
 }
 
 impl<P: Provider> Client<P> {
@@ -60,6 +78,7 @@ impl<P: Provider> Client<P> {
         Self {
             provider: Arc::new(provider),
             default_config: ModelConfig::default(),
+            cost_tracker: CostTracker::new(),
         }
     }
 
@@ -69,6 +88,12 @@ impl<P: Provider> Client<P> {
     /// [`complete_with_config`](Self::complete_with_config) take higher precedence.
     pub fn with_config(mut self, config: ModelConfig) -> Self {
         self.default_config = config;
+        self
+    }
+
+    /// Override the cost tracker used by this client.
+    pub fn with_cost_tracker(mut self, cost_tracker: CostTracker) -> Self {
+        self.cost_tracker = cost_tracker;
         self
     }
 
@@ -82,6 +107,11 @@ impl<P: Provider> Client<P> {
         &self.default_config
     }
 
+    /// Return the cost tracker associated with this client.
+    pub fn cost_tracker(&self) -> &CostTracker {
+        &self.cost_tracker
+    }
+
     /// Send a completion request with the default model configuration.
     ///
     /// # Errors
@@ -91,9 +121,7 @@ impl<P: Provider> Client<P> {
         &self,
         messages: Vec<Message>,
     ) -> Result<CompletionResponse, ProviderError> {
-        self.provider
-            .complete(messages, &self.default_config, &[])
-            .await
+        Ok(self.complete_tracked(messages).await?.response)
     }
 
     /// Send a completion request with a custom model configuration.
@@ -105,7 +133,10 @@ impl<P: Provider> Client<P> {
         messages: Vec<Message>,
         config: &ModelConfig,
     ) -> Result<CompletionResponse, ProviderError> {
-        self.provider.complete(messages, config, &[]).await
+        Ok(self
+            .complete_with_tracking(messages, config, &[], &[])
+            .await?
+            .response)
     }
 
     /// Send a completion request with tool definitions for function calling.
@@ -114,9 +145,59 @@ impl<P: Provider> Client<P> {
         messages: Vec<Message>,
         tools: &[ToolDescriptor],
     ) -> Result<CompletionResponse, ProviderError> {
-        self.provider
-            .complete(messages, &self.default_config, tools)
+        Ok(self
+            .complete_with_tracking(messages, &self.default_config, tools, &[])
+            .await?
+            .response)
+    }
+
+    /// Send a completion request and expose the request scope that was tracked.
+    pub async fn complete_tracked(
+        &self,
+        messages: Vec<Message>,
+    ) -> Result<TrackedCompletionResponse, ProviderError> {
+        self.complete_with_tracking(messages, &self.default_config, &[], &[])
             .await
+    }
+
+    /// Send a completion request and record usage for the generated request scope,
+    /// the global scope, and any additional caller-provided scopes.
+    pub async fn complete_with_tracking(
+        &self,
+        messages: Vec<Message>,
+        config: &ModelConfig,
+        tools: &[ToolDescriptor],
+        additional_scopes: &[String],
+    ) -> Result<TrackedCompletionResponse, ProviderError> {
+        let request_id = new_request_id();
+        let request_scope_name = request_scope(&request_id);
+        let mut tracked_scopes = vec![request_scope_name.clone(), GLOBAL_SCOPE.to_string()];
+
+        for scope in additional_scopes {
+            if !tracked_scopes.iter().any(|existing| existing == scope) {
+                tracked_scopes.push(scope.clone());
+            }
+        }
+
+        let response = self.provider.complete(messages, config, tools).await?;
+        let estimated_cost = self
+            .cost_tracker
+            .estimate_cost(&config.model, &response.usage);
+
+        self.cost_tracker
+            .record_many(
+                tracked_scopes.iter().cloned(),
+                &config.model,
+                &response.usage,
+            )
+            .await;
+
+        Ok(TrackedCompletionResponse {
+            response,
+            request_id,
+            tracked_scopes,
+            estimated_cost,
+        })
     }
 
     /// Open a streaming completion with the default model configuration.
@@ -214,9 +295,57 @@ mod tests {
 
     #[tokio::test]
     async fn test_client_complete() {
-        let client = Client::new(MockProvider);
+        let client = Client::new(MockProvider).with_config(ModelConfig::new("gpt-4"));
         let resp = client.complete(vec![Message::user("hi")]).await.unwrap();
         assert_eq!(resp.content, "hello");
+    }
+
+    #[tokio::test]
+    async fn test_client_complete_tracked_records_request_and_global_scopes() {
+        let client = Client::new(MockProvider).with_config(ModelConfig::new("gpt-4"));
+
+        let tracked = client
+            .complete_tracked(vec![Message::user("hi")])
+            .await
+            .unwrap();
+
+        assert!(tracked.request_id.len() > 10);
+        assert!(tracked
+            .tracked_scopes
+            .iter()
+            .any(|scope| scope == GLOBAL_SCOPE));
+
+        let request_snapshot = client
+            .cost_tracker()
+            .get(&request_scope(&tracked.request_id))
+            .await;
+        assert_eq!(request_snapshot.request_count, 1);
+
+        let global_snapshot = client.cost_tracker().get(GLOBAL_SCOPE).await;
+        assert_eq!(global_snapshot.request_count, 1);
+        assert!(tracked.estimated_cost > 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_client_complete_with_tracking_records_custom_scope() {
+        let client = Client::new(MockProvider).with_config(ModelConfig::new("gpt-4"));
+        let custom_scope = "agent:researcher".to_string();
+
+        let tracked = client
+            .complete_with_tracking(
+                vec![Message::user("hi")],
+                client.default_config(),
+                &[],
+                &[custom_scope.clone()],
+            )
+            .await
+            .unwrap();
+
+        assert!(tracked.tracked_scopes.contains(&custom_scope));
+        assert_eq!(
+            client.cost_tracker().get(&custom_scope).await.request_count,
+            1
+        );
     }
 
     #[tokio::test]

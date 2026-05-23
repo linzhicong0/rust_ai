@@ -31,9 +31,32 @@
 
 // Re-export core types at the crate root for convenience
 pub use crate::types::{
-    Content, ContentPart, CompletionResponse, FinishReason, Message,
+    Content, ContentPart, CompletionResponse, FinishReason, ImageDetail, Message,
     ModelConfig, Role, StreamChunk, ToolCall, ToolCallDelta, Usage,
     AgentEvent, AgentOutput,
+};
+
+// Re-export context management types
+pub use crate::context::{
+    ContextConfig, ContextManager, ContextResult, ContextUsage, TruncationStrategy, estimate_tokens,
+};
+
+// Re-export cost tracking types
+pub use crate::cost::{
+    agent_scope, new_request_id, project_scope, request_scope, workflow_scope,
+    CostAccumulator, CostSnapshot, CostTracker, ModelPricing, PricingTable,
+    GLOBAL_SCOPE,
+};
+
+// Re-export model registry types
+pub use crate::model_registry::{
+    ModelCapability, ModelCost, ModelInfo, ModelRegistry, ModelRegistryError,
+};
+
+// Re-export prompt injection defense types
+pub use crate::prompt_injection::{
+    InjectionPattern, InjectionScanResult, LeakDetectionResult,
+    PromptInjectionDefender, global_defender, has_injection_attempts, has_prompt_leaks,
 };
 
 // Re-export core traits
@@ -41,14 +64,16 @@ pub use crate::provider::Provider;
 pub use crate::tool::{Tool, ToolDescriptor, ToolOutput};
 pub use crate::memory::{Memory, MemoryEntry, ScopedMemory};
 pub use crate::embedder::Embedder;
-pub use crate::guardrail::Guardrail;
-pub use crate::guardrail::PromptInjectionGuard;
+pub use crate::guardrail::{
+    Guardrail, GuardrailAction, GuardrailChain, RegexPiiDetector,
+    LengthLimiter, CustomGuardrail, PiiAction, PromptInjectionGuard
+};
 
 // Re-export configuration
 pub use crate::config::FrameworkConfig;
 
 // Re-export Client — primary entry point per REQ-15.1
-pub use crate::client::Client;
+pub use crate::client::{Client, TrackedCompletionResponse};
 
 // Re-export errors — users typically import these via `use ai_core::Error`
 // or use specific error variants like `ProviderError`
@@ -66,10 +91,14 @@ pub use crate::structured::{StructuredOutputConfig, StructuredOutputValidator, c
 // Module declarations
 pub mod client;
 pub mod config;
+pub mod context;
+pub mod cost;
 pub mod embedder;
 pub mod error;
 pub mod guardrail;
 pub mod memory;
+pub mod model_registry;
+pub mod prompt_injection;
 pub mod provider;
 pub mod structured;
 pub mod template;
@@ -164,6 +193,9 @@ mod tests {
         let _event = AgentEvent::Text("test".to_string());
         let _output = AgentOutput {
             content: "test".to_string(),
+            usage: Usage::default(),
+            estimated_cost: 0.0,
+            tracked_scopes: vec![],
         };
 
         // Verify usage is accessible
@@ -223,7 +255,12 @@ mod tests {
         let _ = Role::User;
         let _ = Content::Text("test".to_string());
         let _ = AgentEvent::Text("test".to_string());
-        let _ = AgentOutput { content: "test".to_string() };
+        let _ = AgentOutput {
+            content: "test".to_string(),
+            usage: Usage::default(),
+            estimated_cost: 0.0,
+            tracked_scopes: vec![],
+        };
         let _ = Usage {
             prompt_tokens: 0,
             completion_tokens: 0,

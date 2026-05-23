@@ -108,7 +108,7 @@ impl AnthropicProvider {
                         ContentPart::Text(t) => {
                             AnthropicContentPart::Text { type_: "text".to_string(), text: t }
                         }
-                        ContentPart::Image { url, .. } => {
+                        ContentPart::Image { url, media_type, .. } => {
                             // Extract base64 data if present
                             let (source, media_type) = if url.starts_with("data:") {
                                 let parts: Vec<&str> = url.splitn(2, ':').collect();
@@ -129,11 +129,22 @@ impl AnthropicProvider {
                                 (
                                     AnthropicSource {
                                         type_: "url".to_string(),
-                                        media_type: "image/jpeg".to_string(),
+                                        media_type: media_type.clone(),
                                         data: url,
                                     },
-                                    "image/jpeg".to_string(),
+                                    media_type,
                                 )
+                            };
+                            AnthropicContentPart::Image { type_: "image".to_string(), source }
+                        }
+                        ContentPart::ImageBytes { data, media_type, .. } => {
+                            // Convert bytes to base64
+                            use base64::prelude::*;
+                            let base64 = BASE64_STANDARD.encode(&data);
+                            let source = AnthropicSource {
+                                type_: "base64".to_string(),
+                                media_type: media_type.clone(),
+                                data: base64,
                             };
                             AnthropicContentPart::Image { type_: "image".to_string(), source }
                         }

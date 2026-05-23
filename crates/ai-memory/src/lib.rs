@@ -37,10 +37,12 @@
 //! # }
 //! ```
 
+pub mod agent;
 pub mod in_memory;
 pub mod scoped;
 pub mod shared;
 
+pub use agent::AgentMemory;
 pub use in_memory::InMemoryMemory;
 pub use scoped::ThreadScopedMemory;
 pub use shared::SharedMemory;
