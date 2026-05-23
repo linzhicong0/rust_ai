@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Framework — Usage Guide</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-card-hover: #222638;
+    --bg-phase: #141720;
+    --border: #2a2e3e;
+    --border-light: #353a50;
+    --text: #e2e4ed;
+    --text-muted: #8b90a5;
+    --text-dim: #5c6078;
+    --accent: #7c6aef;
+    --accent-light: #9d8df5;
+    --accent-bg: rgba(124,106,239,0.08);
+    --green: #4ade80;
+    --green-bg: rgba(74,222,128,0.1);
+    --yellow: #fbbf24;
+    --yellow-bg: rgba(251,191,36,0.1);
+    --red: #f87171;
+    --red-bg: rgba(248,113,113,0.1);
+    --blue: #60a5fa;
+    --blue-bg: rgba(96,165,250,0.1);
+    --code-bg: #12141e;
+    --code-text: #c9d1d9;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+
+  [data-theme="light"] {
+    --bg: #f8f9fc;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f5f6fa;
+    --bg-phase: #f0f1f6;
+    --border: #e2e4ed;
+    --border-light: #d0d3e0;
+    --text: #1a1d2e;
+    --text-muted: #5c6078;
+    --text-dim: #8b90a5;
+    --accent: #6c5ce7;
+    --accent-light: #7c6aef;
+    --accent-bg: rgba(108,92,231,0.06);
+    --green-bg: rgba(34,197,94,0.08);
+    --yellow-bg: rgba(234,179,8,0.08);
+    --red-bg: rgba(239,68,68,0.08);
+    --blue-bg: rgba(59,130,246,0.08);
+    --code-bg: #f1f3f9;
+    --code-text: #374151;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* Header */
+  header {
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+  }
+
+  header h1 span { color: var(--accent); }
+
+  header p {
+    color: var(--text-muted);
+    margin-top: 8px;
+    font-size: 1rem;
+  }
+
+  /* Theme toggle */
+  .theme-toggle {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+
+  .theme-toggle:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  /* Navigation */
+  .sidebar-nav {
+    position: sticky;
+    top: 24px;
+  }
+
+  .nav-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 48px;
+  }
+
+  .nav-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-decoration: none;
+    color: var(--text);
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .nav-card:hover {
+    border-color: var(--accent);
+    background: var(--bg-card-hover);
+    transform: translateY(-1px);
+  }
+
+  .nav-card .icon { font-size: 1.4rem; margin-bottom: 4px; }
+  .nav-card .title { font-weight: 700; font-size: 0.95rem; }
+  .nav-card .desc { color: var(--text-muted); font-size: 0.82rem; line-height: 1.5; }
+
+  /* TOC */
+  .toc {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 56px;
+  }
+
+  .toc h3 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+
+  .toc ol {
+    list-style: none;
+    counter-reset: toc;
+    column-count: 2;
+    column-gap: 32px;
+  }
+
+  .toc li {
+    counter-increment: toc;
+    margin-bottom: 6px;
+    break-inside: avoid;
+  }
+
+  .toc li a {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.88rem;
+    transition: color 0.15s;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .toc li a::before {
+    content: counter(toc, decimal-leading-zero);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.78rem;
+    min-width: 22px;
+  }
+
+  .toc li a:hover { color: var(--accent-light); }
+
+  /* Section */
+  .section {
+    margin-bottom: 64px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-number {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+  }
+
+  .section-header h2 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: var(--border-light); }
+
+  .card h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card p {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    margin-bottom: 16px;
+  }
+
+  /* Code blocks */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    overflow-x: auto;
+    margin: 0 0 12px;
+    font-size: 0.84rem;
+    line-height: 1.75;
+    color: var(--code-text);
+    tab-size: 4;
+  }
+
+  pre code {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Menlo, monospace;
+  }
+
+  .code-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0;
+  }
+
+  .code-label span {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    font-weight: 600;
+    background: var(--bg-phase);
+    padding: 3px 10px;
+    border-radius: 4px 4px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+  }
+
+  .code-label + pre { border-top-left-radius: 0; margin-top: 0; }
+
+  /* Inline code */
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Menlo, monospace;
+    background: var(--accent-bg);
+    color: var(--accent-light);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.84em;
+  }
+
+  pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  /* Syntax highlight tokens */
+  .kw { color: #c678dd; }
+  .fn { color: #61afef; }
+  .ty { color: #e5c07b; }
+  .str { color: #98c379; }
+  .mac { color: #56b6c2; }
+  .cm { color: #5c6370; font-style: italic; }
+  .num { color: #d19a66; }
+  .op { color: #56b6c2; }
+
+  [data-theme="light"] .kw { color: #a626a4; }
+  [data-theme="light"] .fn { color: #4078f2; }
+  [data-theme="light"] .ty { color: #986801; }
+  [data-theme="light"] .str { color: #50a14f; }
+  [data-theme="light"] .mac { color: #0184bc; }
+  [data-theme="light"] .cm { color: #a0a1a7; }
+  [data-theme="light"] .num { color: #986801; }
+
+  /* Badge */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .badge-purple { background: var(--accent-bg); color: var(--accent-light); border: 1px solid rgba(124,106,239,0.2); }
+  .badge-green { background: var(--green-bg); color: var(--green); border: 1px solid rgba(74,222,128,0.2); }
+  .badge-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(96,165,250,0.2); }
+  .badge-yellow { background: var(--yellow-bg); color: var(--yellow); border: 1px solid rgba(251,191,36,0.2); }
+  .badge-red { background: var(--red-bg); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
+
+  /* Feature grid */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 16px 0;
+  }
+
+  .feature-item {
+    background: var(--bg-phase);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    transition: border-color 0.2s;
+  }
+
+  .feature-item:hover { border-color: var(--accent); }
+
+  .feature-item .emoji { font-size: 1.6rem; margin-bottom: 8px; }
+  .feature-item .label { font-weight: 700; font-size: 0.88rem; margin-bottom: 4px; }
+  .feature-item .sub { color: var(--text-muted); font-size: 0.78rem; }
+
+  /* Provider grid */
+  .provider-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 16px 0;
+  }
+
+  .provider-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.2s;
+  }
+
+  .provider-card:hover {
+    border-color: var(--accent);
+    background: var(--bg-card-hover);
+  }
+
+  .provider-card h4 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .provider-card p { color: var(--text-muted); font-size: 0.82rem; margin-bottom: 10px; }
+
+  /* Callout */
+  .callout {
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 0.88rem;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .callout-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+
+  .callout-info { background: var(--blue-bg); border: 1px solid rgba(96,165,250,0.15); color: var(--text); }
+  .callout-tip { background: var(--green-bg); border: 1px solid rgba(74,222,128,0.15); color: var(--text); }
+  .callout-warn { background: var(--yellow-bg); border: 1px solid rgba(251,191,36,0.15); color: var(--text); }
+
+  /* Trait table */
+  .trait-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.88rem;
+  }
+
+  .trait-table th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--bg-phase);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+
+  .trait-table td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .trait-table tr:hover td { background: var(--bg-card-hover); }
+
+  /* Steps */
+  .steps { margin: 16px 0; padding-left: 0; list-style: none; counter-reset: steps; }
+
+  .steps li {
+    counter-increment: steps;
+    padding: 12px 16px 12px 50px;
+    position: relative;
+    margin-bottom: 8px;
+    background: var(--bg-phase);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+
+  .steps li::before {
+    content: counter(steps);
+    position: absolute;
+    left: 16px;
+    top: 12px;
+    background: var(--accent);
+    color: #fff;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 0;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    margin-top: 32px;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    header h1 { font-size: 1.5rem; }
+    .nav-grid { grid-template-columns: 1fr; }
+    .toc ol { column-count: 1; }
+    .feature-grid { grid-template-columns: 1fr 1fr; }
+    .provider-grid { grid-template-columns: 1fr; }
+    pre { font-size: 0.78rem; padding: 14px 16px; }
+  }
+
+  @media (max-width: 480px) {
+    .feature-grid { grid-template-columns: 1fr; }
+    .container { padding: 0 16px; }
+  }
+
+  /* Smooth scrolling */
+  html { scroll-behavior: smooth; }
+
+  /* Back to top */
+  .back-top {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 40px;
+    height: 40px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow);
+    transition: opacity 0.2s;
+    z-index: 100;
+  }
+
+  .back-top.visible { display: flex; }
+</style>
+</head>
+<body>
+
+<button class="back-top" id="backTop" onclick="window.scrollTo({top:0})">&#8593;</button>
+
+<div class="container">
+
+<!-- ═══════════════════════════════════════════ HEADER ═══════════════════════════════════════════ -->
+<header>
+  <div class="header-row">
+    <div>
+      <h1>Usage <span>Guide</span></h1>
+      <p>A complete guide to building AI-powered applications with the Rust AI Framework</p>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">&#9790; Light / Dark</button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════ NAV CARDS ═══════════════════════════════════════════ -->
+<div class="nav-grid">
+  <a class="nav-card" href="#quickstart"><span class="icon">&#9889;</span><span class="title">Quick Start</span><span class="desc">Get running in under 5 minutes</span></a>
+  <a class="nav-card" href="#providers"><span class="icon">&#127760;</span><span class="title">Providers</span><span class="desc">OpenAI, Anthropic, Google, Ollama, DeepSeek</span></a>
+  <a class="nav-card" href="#chat"><span class="icon">&#128172;</span><span class="title">Chat Completions</span><span class="desc">Send messages and receive responses</span></a>
+  <a class="nav-card" href="#streaming"><span class="icon">&#127909;</span><span class="title">Streaming</span><span class="desc">Real-time token-by-token output</span></a>
+  <a class="nav-card" href="#tools"><span class="icon">&#128295;</span><span class="title">Tool Calling</span><span class="desc">Function calling and tool integration</span></a>
+  <a class="nav-card" href="#structured"><span class="icon">&#128203;</span><span class="title">Structured Output</span><span class="desc">JSON schema validation and retries</span></a>
+  <a class="nav-card" href="#agents"><span class="icon">&#129302;</span><span class="title">Agents</span><span class="desc">Autonomous agents with ReAct loops</span></a>
+  <a class="nav-card" href="#memory"><span class="icon">&#129504;</span><span class="title">Memory</span><span class="desc">Conversation history and context</span></a>
+</div>
+
+<!-- ═══════════════════════════════════════════ TOC ═══════════════════════════════════════════ -->
+<div class="toc">
+  <h3>Table of Contents</h3>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#quickstart">Quick Start</a></li>
+    <li><a href="#providers">Providers</a></li>
+    <li><a href="#chat">Chat Completions</a></li>
+    <li><a href="#streaming">Streaming</a></li>
+    <li><a href="#tools">Tool Calling</a></li>
+    <li><a href="#structured">Structured Output</a></li>
+    <li><a href="#agents">Agents</a></li>
+    <li><a href="#memory">Memory</a></li>
+    <li><a href="#templates">Templates</a></li>
+    <li><a href="#configuration">Configuration</a></li>
+    <li><a href="#errors">Error Handling</a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════ 1. OVERVIEW ═══════════════════════════════════════════ -->
+<section class="section" id="overview">
+  <div class="section-header">
+    <span class="section-number">01</span>
+    <h2>Overview</h2>
+  </div>
+
+  <p style="color:var(--text-muted);margin-bottom:20px;">
+    The Rust AI Framework is a modular, async-first toolkit for building LLM-powered applications. It provides a trait-based abstraction over multiple providers, built-in streaming, structured output, tool calling, and autonomous agents &mdash; all with Rust's safety and performance guarantees.
+  </p>
+
+  <div class="feature-grid">
+    <div class="feature-item">
+      <div class="emoji">&#128640;</div>
+      <div class="label">Async-first</div>
+      <div class="sub">Built on tokio &amp; futures</div>
+    </div>
+    <div class="feature-item">
+      <div class="emoji">&#128274;</div>
+      <div class="label">Type-safe</div>
+      <div class="sub">Strong Rust types everywhere</div>
+    </div>
+    <div class="feature-item">
+      <div class="emoji">&#128260;</div>
+      <div class="label">Streaming</div>
+      <div class="sub">Real-time token streams</div>
+    </div>
+    <div class="feature-item">
+      <div class="emoji">&#128295;</div>
+      <div class="label">Tool Calling</div>
+      <div class="sub">Function calling support</div>
+    </div>
+    <div class="feature-item">
+      <div class="emoji">&#129302;</div>
+      <div class="label">Agents</div>
+      <div class="sub">Autonomous ReAct loops</div>
+    </div>
+    <div class="feature-item">
+      <div class="emoji">&#127919;</div>
+      <div class="label">Structured Output</div>
+      <div class="sub">JSON schema + validation</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <h3>Crate Architecture</h3>
+    <p>The framework is organized into focused crates. Import only what you need.</p>
+    <table class="trait-table">
+      <thead><tr><th>Crate</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>ai-core</code></td><td>Core traits, types, client, config, templates</td></tr>
+        <tr><td><code>ai-agent</code></td><td>Agent builder with ReAct loop and tool orchestration</td></tr>
+        <tr><td><code>ai-memory</code></td><td>In-memory, thread-scoped, and shared memory backends</td></tr>
+        <tr><td><code>ai-tools-macros</code></td><td>Procedural macro for defining tools from functions</td></tr>
+        <tr><td><code>ai-provider-openai</code></td><td>OpenAI GPT-4 / GPT-3.5 provider</td></tr>
+        <tr><td><code>ai-provider-anthropic</code></td><td>Anthropic Claude provider</td></tr>
+        <tr><td><code>ai-provider-google</code></td><td>Google Gemini provider</td></tr>
+        <tr><td><code>ai-provider-deepseek</code></td><td>DeepSeek provider</td></tr>
+        <tr><td><code>ai-provider-ollama</code></td><td>Local Ollama models provider</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 2. QUICK START ═══════════════════════════════════════════ -->
+<section class="section" id="quickstart">
+  <div class="section-header">
+    <span class="section-number">02</span>
+    <h2>Quick Start</h2>
+  </div>
+
+  <div class="card">
+    <h3>Step 1 &mdash; Add Dependencies</h3>
+    <p>Add the core crate and your chosen provider to <code>Cargo.toml</code>.</p>
+    <div class="code-label"><span>Cargo.toml</span></div>
+<pre><code><span class="str">[dependencies]</span>
+<span class="ty">ai-core</span> = { path = <span class="str">"crates/ai-core"</span> }
+<span class="ty">ai-provider-openai</span> = { path = <span class="str">"crates/ai-provider-openai"</span> }
+<span class="ty">tokio</span> = { version = <span class="str">"1"</span>, features = [<span class="str">"full"</span>] }
+</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Step 2 &mdash; Set Environment Variables</h3>
+    <p>The framework reads API keys from environment variables.</p>
+<pre><code><span class="kw">export</span> OPENAI_API_KEY=<span class="str">"sk-..."</span>
+<span class="kw">export</span> ANTHROPIC_API_KEY=<span class="str">"sk-ant-..."</span>
+<span class="kw">export</span> GOOGLE_API_KEY=<span class="str">"AIza..."</span>
+</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Step 3 &mdash; Your First Completion</h3>
+    <p>Create a client, send a message, and print the response.</p>
+    <div class="code-label"><span>src/main.rs</span></div>
+<pre><code><span class="kw">use</span> ai_core::client::Client;
+<span class="kw">use</span> ai_core::types::{Message, ModelConfig};
+<span class="kw">use</span> ai_provider_openai::OpenAiProvider;
+
+<span class="attr">#[tokio::main]</span>
+<span class="kw">async fn</span> <span class="fn">main</span>() -> Result&lt;(), Box&lt;<span class="kw">dyn</span> std::error::Error&gt;&gt; {
+    <span class="cm">// Create a provider with your API key</span>
+    <span class="kw">let</span> provider = OpenAiProvider::new(std::env::var(<span class="str">"OPENAI_API_KEY"</span>)?);
+
+    <span class="cm">// Wrap it in a client</span>
+    <span class="kw">let</span> client = Client::new(provider)
+        .with_config(ModelConfig::new(<span class="str">"gpt-4"</span>));
+
+    <span class="cm">// Send a message</span>
+    <span class="kw">let</span> response = client
+        .complete(<span class="kw">vec</span>![Message::user(<span class="str">"What is Rust?"</span>)])
+        .<span class="kw">await</span>?;
+
+    <span class="fn">println!</span>(<span class="str">"{}"</span>, response.content);
+    Ok(())
+}
+</code></pre>
+  </div>
+
+  <div class="callout callout-tip">
+    <span class="callout-icon">&#128161;</span>
+    <div><strong>Tip:</strong> Swap <code>OpenAiProvider</code> for any other provider (Anthropic, Google, Ollama, DeepSeek) without changing any other code. The <code>Provider</code> trait ensures a uniform interface.</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 3. PROVIDERS ═══════════════════════════════════════════ -->
+<section class="section" id="providers">
+  <div class="section-header">
+    <span class="section-number">03</span>
+    <h2>Providers</h2>
+  </div>
+
+  <p style="color:var(--text-muted);margin-bottom:20px;">
+    Every provider implements the <code>Provider</code> trait. Construct one, pass it to a <code>Client</code>, and you're ready to go.
+  </p>
+
+  <div class="provider-grid">
+    <div class="provider-card">
+      <h4><span class="badge badge-green">OpenAI</span></h4>
+      <p>GPT-4, GPT-3.5 Turbo with JSON mode, streaming, and embeddings</p>
+      <div class="code-label"><span>Rust</span></div>
+<pre style="margin-bottom:0"><code><span class="kw">use</span> ai_provider_openai::OpenAiProvider;
+
+<span class="kw">let</span> p = OpenAiProvider::new(
+    std::env::var(<span class="str">"OPENAI_API_KEY"</span>)?
+);</code></pre>
+    </div>
+    <div class="provider-card">
+      <h4><span class="badge badge-purple">Anthropic</span></h4>
+      <p>Claude Opus, Sonnet, Haiku with tool calling and streaming</p>
+      <div class="code-label"><span>Rust</span></div>
+<pre style="margin-bottom:0"><code><span class="kw">use</span> ai_provider_anthropic::AnthropicProvider;
+
+<span class="kw">let</span> p = AnthropicProvider::new(
+    std::env::var(<span class="str">"ANTHROPIC_API_KEY"</span>)?
+);</code></pre>
+    </div>
+    <div class="provider-card">
+      <h4><span class="badge badge-blue">Google</span></h4>
+      <p>Gemini Pro with streaming and embeddings support</p>
+      <div class="code-label"><span>Rust</span></div>
+<pre style="margin-bottom:0"><code><span class="kw">use</span> ai_provider_google::GoogleProvider;
+
+<span class="kw">let</span> p = GoogleProvider::new(
+    std::env::var(<span class="str">"GOOGLE_API_KEY"</span>)?
+);</code></pre>
+    </div>
+    <div class="provider-card">
+      <h4><span class="badge badge-yellow">DeepSeek</span></h4>
+      <p>DeepSeek Chat and Reasoner models</p>
+      <div class="code-label"><span>Rust</span></div>
+<pre style="margin-bottom:0"><code><span class="kw">use</span> ai_provider_deepseek::DeepSeekProvider;
+
+<span class="kw">let</span> p = DeepSeekProvider::new(
+    std::env::var(<span class="str">"DEEPSEEK_API_KEY"</span>)?
+);</code></pre>
+    </div>
+    <div class="provider-card">
+      <h4><span class="badge badge-red">Ollama</span></h4>
+      <p>Run local models like Llama, Mistral, and more</p>
+      <div class="code-label"><span>Rust</span></div>
+<pre style="margin-bottom:0"><code><span class="kw">use</span> ai_provider_ollama::OllamaProvider;
+
+<span class="kw">let</span> p = OllamaProvider::new(
+    <span class="str">"http://localhost:11434"</span>
+);</code></pre>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <h3>The Provider Trait</h3>
+    <p>All providers implement this async trait with four core methods.</p>
+<pre><code><span class="attr">#[async_trait]</span>
+<span class="kw">pub trait</span> <span class="ty">Provider</span>: Send + Sync {
+    <span class="kw">async fn</span> <span class="fn">complete</span>(
+        &amp;<span class="kw">self</span>,
+        messages: Vec&lt;Message&gt;,
+        config: &amp;ModelConfig,
+        tools: &amp;[ToolDescriptor],
+    ) -> Result&lt;CompletionResponse, ProviderError&gt;;
+
+    <span class="kw">fn</span> <span class="fn">stream</span>(
+        &amp;<span class="kw">self</span>,
+        messages: Vec&lt;Message&gt;,
+        config: &amp;ModelConfig,
+        tools: &amp;[ToolDescriptor],
+    ) -> BoxStream&lt;<span class="str">'static</span>, Result&lt;StreamChunk, ProviderError&gt;&gt;;
+
+    <span class="kw">async fn</span> <span class="fn">embed</span>(&amp;<span class="kw">self</span>, texts: Vec&lt;String&gt;) -> Result&lt;Vec&lt;Vec&lt;<span class="ty">f32</span>&gt;&gt;, ProviderError&gt;;
+    <span class="kw">fn</span> <span class="fn">name</span>(&amp;<span class="kw">self</span>) -> &amp;<span class="ty">str</span>;
+}</code></pre>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 4. CHAT COMPLETIONS ═══════════════════════════════════════════ -->
+<section class="section" id="chat">
+  <div class="section-header">
+    <span class="section-number">04</span>
+    <h2>Chat Completions</h2>
+  </div>
+
+  <div class="card">
+    <h3>Creating Messages</h3>
+    <p>Use the <code>Message</code> builder methods to construct conversations.</p>
+<pre><code><span class="kw">use</span> ai_core::types::Message;
+
+<span class="kw">let</span> messages = <span class="kw">vec</span>![
+    Message::system(<span class="str">"You are a helpful assistant."</span>),
+    Message::user(<span class="str">"Explain ownership in Rust."</span>),
+];</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Configuring the Model</h3>
+    <p>Use <code>ModelConfig</code> to set the model and generation parameters. Convenience constructors are available for popular models.</p>
+<pre><code><span class="kw">use</span> ai_core::types::ModelConfig;
+
+<span class="cm">// From scratch</span>
+<span class="kw">let</span> config = ModelConfig::new(<span class="str">"gpt-4"</span>)
+    .temperature(<span class="num">0.7</span>)
+    .max_tokens(<span class="num">1024</span>)
+    .top_p(<span class="num">0.9</span>);
+
+<span class="cm">// Convenience constructors</span>
+<span class="kw">let</span> config = ModelConfig::gpt4();
+<span class="kw">let</span> config = ModelConfig::claude_opus();</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Basic Completion</h3>
+    <p>Send messages and receive a complete response.</p>
+<pre><code><span class="kw">let</span> client = Client::new(provider)
+    .with_config(ModelConfig::new(<span class="str">"gpt-4"</span>));
+
+<span class="kw">let</span> response = client
+    .complete(<span class="kw">vec</span>![
+        Message::system(<span class="str">"You are a Rust expert."</span>),
+        Message::user(<span class="str">"Explain lifetimes."</span>),
+    ])
+    .<span class="kw">await</span>?;
+
+<span class="fn">println!</span>(<span class="str">"Content: {}"</span>, response.content);
+<span class="fn">println!</span>(<span class="str">"Tokens used: {}"</span>, response.usage.total_tokens);
+<span class="fn">println!</span>(<span class="str">"Finish reason: {:?}"</span>, response.finish_reason);</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Multi-Turn Conversation</h3>
+    <p>Build a conversation by including prior assistant messages.</p>
+<pre><code><span class="kw">let</span> messages = <span class="kw">vec</span>![
+    Message::user(<span class="str">"What is Rust?"</span>),
+    Message::assistant(<span class="str">"Rust is a systems programming language..."</span>),
+    Message::user(<span class="str">"What are its advantages?"</span>),
+];
+
+<span class="kw">let</span> response = client.complete(messages).<span class="kw">await</span>?;</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Embeddings</h3>
+    <p>Generate vector embeddings for text.</p>
+<pre><code><span class="kw">let</span> embeddings = client
+    .embed(<span class="kw">vec</span>![
+        <span class="str">"Rust is fast"</span>.to_string(),
+        <span class="str">"Python is easy"</span>.to_string(),
+    ])
+    .<span class="kw">await</span>?;
+
+<span class="kw">for</span> (i, emb) <span class="kw">in</span> embeddings.iter().enumerate() {
+    <span class="fn">println!</span>(<span class="str">"Embedding {}: {} dimensions"</span>, i, emb.len());
+}</code></pre>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 5. STREAMING ═══════════════════════════════════════════ -->
+<section class="section" id="streaming">
+  <div class="section-header">
+    <span class="section-number">05</span>
+    <h2>Streaming</h2>
+  </div>
+
+  <p style="color:var(--text-muted);margin-bottom:20px;">
+    Stream tokens in real time. The <code>stream()</code> method returns a <code>BoxStream</code> that yields <code>StreamChunk</code> items as they arrive from the provider.
+  </p>
+
+  <div class="card">
+    <h3>Basic Streaming</h3>
+<pre><code><span class="kw">use</span> futures::StreamExt;
+
+<span class="kw">let mut</span> stream = client.stream(<span class="kw">vec</span>![
+    Message::user(<span class="str">"Write a haiku about Rust."</span>),
+]);
+
+<span class="kw">while let</span> Some(result) = stream.next().<span class="kw">await</span> {
+    <span class="kw">match</span> result {
+        Ok(chunk) => {
+            <span class="kw">if let</span> Some(delta) = chunk.delta {
+                <span class="fn">print!</span>(<span class="str">"{}"</span>, delta);
+            }
+            <span class="kw">if let</span> Some(reason) = chunk.finish_reason {
+                <span class="fn">println!</span>(<span class="str">"\nFinished: {:?}"</span>, reason);
+            }
+        }
+        Err(e) => <span class="fn">eprintln!</span>(<span class="str">"Error: {}"</span>, e),
+    }
+}</code></pre>
+  </div>
+
+  <div class="callout callout-info">
+    <span class="callout-icon">&#8505;&#65039;</span>
+    <div><strong>Note:</strong> Streaming returns <code>BoxStream&lt;'static, Result&lt;StreamChunk, ProviderError&gt;&gt;</code>. Use <code>futures::StreamExt</code> to iterate. Each <code>StreamChunk</code> contains an optional <code>delta</code> (text) and optional <code>finish_reason</code>.</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 6. TOOL CALLING ═══════════════════════════════════════════ -->
+<section class="section" id="tools">
+  <div class="section-header">
+    <span class="section-number">06</span>
+    <h2>Tool Calling</h2>
+  </div>
+
+  <p style="color:var(--text-muted);margin-bottom:20px;">
+    Define tools with the <code>Tool</code> trait, register them, and let the LLM decide when to call them. The framework handles the full tool-calling lifecycle.
+  </p>
+
+  <div class="card">
+    <h3>Defining a Tool</h3>
+    <p>Implement the <code>Tool</code> trait with a descriptor and an async execute method.</p>
+<pre><code><span class="kw">use</span> ai_core::tool::{Tool, ToolDescriptor, ToolOutput, ToolError};
+<span class="kw">use</span> serde_json::json;
+<span class="kw">use</span> async_trait::async_trait;
+
+<span class="kw">struct</span> <span class="ty">WeatherTool</span>;
+
+<span class="attr">#[async_trait]</span>
+<span class="kw">impl</span> <span class="ty">Tool</span> <span class="kw">for</span> <span class="ty">WeatherTool</span> {
+    <span class="kw">fn</span> <span class="fn">descriptor</span>(&amp;<span class="kw">self</span>) -> ToolDescriptor {
+        ToolDescriptor::new(
+            <span class="str">"get_weather"</span>,
+            <span class="str">"Get the current weather for a location"</span>,
+            json!({
+                <span class="str">"type"</span>: <span class="str">"object"</span>,
+                <span class="str">"properties"</span>: {
+                    <span class="str">"location"</span>: { <span class="str">"type"</span>: <span class="str">"string"</span> },
+                    <span class="str">"unit"</span>:    { <span class="str">"type"</span>: <span class="str">"string"</span>, <span class="str">"enum"</span>: [<span class="str">"celsius"</span>, <span class="str">"fahrenheit"</span>] }
+                },
+                <span class="str">"required"</span>: [<span class="str">"location"</span>]
+            }),
+        )
+    }
+
+    <span class="kw">async fn</span> <span class="fn">execute</span>(&amp;<span class="kw">self</span>, input: serde_json::Value) -> Result&lt;ToolOutput, ToolError&gt; {
+        <span class="kw">let</span> location = input[<span class="str">"location"</span>].as_str().unwrap_or(<span class="str">"unknown"</span>);
+        <span class="cm">// Your API call here...</span>
+        Ok(ToolOutput::success(<span class="fn">format!</span>(<span class="str">"72°F in {}"</span>, location)))
+    }
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Using Tools with a Client</h3>
+    <p>Pass tool descriptors to <code>complete_with_tools</code>. The model will return tool calls in the response.</p>
+<pre><code><span class="kw">let</span> weather = WeatherTool;
+<span class="kw">let</span> descriptors = <span class="kw">vec</span>![weather.descriptor()];
+
+<span class="kw">let</span> response = client
+    .complete_with_tools(
+        <span class="kw">vec</span>![Message::user(<span class="str">"What's the weather in Tokyo?"</span>)],
+        &amp;descriptors,
+    )
+    .<span class="kw">await</span>?;
+
+<span class="kw">for</span> tool_call <span class="kw">in</span> &amp;response.tool_calls {
+    <span class="fn">println!</span>(<span class="str">"Model wants to call: {}"</span>, tool_call.name);
+    <span class="fn">println!</span>(<span class="str">"Arguments: {}"</span>, tool_call.arguments);
+
+    <span class="cm">// Execute the tool and continue the conversation</span>
+    <span class="kw">let</span> result = weather.execute(tool_call.arguments.clone()).<span class="kw">await</span>?;
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Tool Registry</h3>
+    <p>Register multiple tools and look them up by name.</p>
+<pre><code><span class="kw">use</span> ai_core::tool::ToolRegistry;
+
+<span class="kw">let mut</span> registry = ToolRegistry::new();
+registry.register(WeatherTool);
+registry.register(SearchTool);
+registry.register(CalculatorTool);
+
+<span class="cm">// Get all descriptors for sending to the model</span>
+<span class="kw">let</span> descriptors = registry.descriptors();
+
+<span class="cm">// Look up and execute a tool by name</span>
+<span class="kw">if let</span> Some(tool) = registry.get(<span class="str">"get_weather"</span>) {
+    <span class="kw">let</span> result = tool.execute(json!({<span class="str">"location"</span>: <span class="str">"Paris"</span>})).<span class="kw">await</span>?;
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Tool Macro <span class="badge badge-green">Ergonomic</span></h3>
+    <p>Use the <code>#[tool]</code> procedural macro to define tools from simple async functions.</p>
+<pre><code><span class="kw">use</span> ai_tools_macros::tool;
+<span class="kw">use</span> ai_core::tool::{ToolOutput, ToolError};
+
+<span class="attr">#[tool(name = <span class="str">"greet"</span>, description = <span class="str">"Greet a user by name"</span>)]</span>
+<span class="kw">async fn</span> <span class="fn">greet_user</span>(input: serde_json::Value) -> Result&lt;ToolOutput, ToolError&gt; {
+    <span class="kw">let</span> name = input[<span class="str">"name"</span>].as_str().unwrap_or(<span class="str">"world"</span>);
+    Ok(ToolOutput::success(<span class="fn">format!</span>(<span class="str">"Hello, {}!"</span>, name)))
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Tool Outputs</h3>
+    <table class="trait-table">
+      <thead><tr><th>Method</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>ToolOutput::success(text)</code></td><td>Successful text result</td></tr>
+        <tr><td><code>ToolOutput::error(text)</code></td><td>Error result (model sees the error)</td></tr>
+        <tr><td><code>ToolOutput::json(&amp;value)</code></td><td>Serialize a struct as JSON output</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 7. STRUCTURED OUTPUT ═══════════════════════════════════════════ -->
+<section class="section" id="structured">
+  <div class="section-header">
+    <span class="section-number">07</span>
+    <h2>Structured Output</h2>
+  </div>
+
+  <p style="color:var(--text-muted);margin-bottom:20px;">
+    Enforce JSON schema on model responses. The framework validates output and retries automatically when validation fails.
+  </p>
+
+  <div class="card">
+    <h3>JSON Schema Validation</h3>
+    <p>Define a JSON schema and use the structured output validator with automatic retries.</p>
+<pre><code><span class="kw">use</span> ai_core::structured::{StructuredOutputConfig, StructuredOutputValidator, complete_structured};
+<span class="kw">use</span> serde_json::json;
+
+<span class="kw">let</span> schema = json!({
+    <span class="str">"type"</span>: <span class="str">"object"</span>,
+    <span class="str">"properties"</span>: {
+        <span class="str">"name"</span>:  { <span class="str">"type"</span>: <span class="str">"string"</span> },
+        <span class="str">"age"</span>:   { <span class="str">"type"</span>: <span class="str">"integer"</span> },
+        <span class="str">"email"</span>: { <span class="str">"type"</span>: <span class="str">"string"</span>, <span class="str">"format"</span>: <span class="str">"email"</span> }
+    },
+    <span class="str">"required"</span>: [<span class="str">"name"</span>, <span class="str">"age"</span>]
+});
+
+<span class="kw">let</span> config = StructuredOutputConfig::new(schema)
+    .with_max_retries(<span class="num">3</span>);
+
+<span class="kw">let</span> validator = StructuredOutputValidator::new(config)?;
+
+<span class="kw">let</span> result = complete_structured(&amp;validator, |prompt| {
+    Box::pin(<span class="kw">async move</span> {
+        <span class="cm">// Call your provider here with the augmented prompt</span>
+        <span class="kw">let</span> response = client.complete(<span class="kw">vec</span>![
+            Message::user(prompt)
+        ]).<span class="kw">await</span>?;
+        Ok(response.content)
+    })
+}).<span class="kw">await</span>?;
+
+<span class="fn">assert_eq!</span>(result[<span class="str">"name"</span>], <span class="str">"Alice"</span>);
+<span class="fn">assert_eq!</span>(result[<span class="str">"age"</span>], <span class="num">30</span>);</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Extracting JSON from Responses</h3>
+    <p>The framework provides a helper to extract JSON from markdown code blocks or raw text.</p>
+<pre><code><span class="kw">use</span> ai_core::structured::extract_json;
+
+<span class="kw">let</span> raw = <span class="str">r#"Here is the data:
+```json
+{"name": "Alice", "age": 30}
+```
+"#</span>;
+
+<span class="kw">let</span> json_str = extract_json(raw);
+<span class="fn">assert_eq!</span>(json_str, <span class="kw">Some</span>(<span class="str">r#"{"name": "Alice", "age": 30}"</span>.to_string()));</code></pre>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 8. AGENTS ═══════════════════════════════════════════ -->
+<section class="section" id="agents">
+  <div class="section-header">
+    <span class="section-number">08</span>
+    <h2>Agents</h2>
+  </div>
+
+  <p style="color:var(--text-muted);margin-bottom:20px;">
+    Build autonomous agents that reason, use tools, and iterate with a ReAct (Reason + Act) loop. Agents combine a provider, memory, tools, and a persona.
+  </p>
+
+  <div class="card">
+    <h3>Building an Agent</h3>
+    <p>Use the fluent <code>AgentBuilder</code> to configure an agent with a provider, memory, tools, and persona.</p>
+<pre><code><span class="kw">use</span> ai_agent::{AgentBuilder, Agent};
+<span class="kw">use</span> ai_memory::InMemoryMemory;
+<span class="kw">use</span> ai_provider_openai::OpenAiProvider;
+
+<span class="kw">let</span> memory = InMemoryMemory::new(<span class="num">100</span>);
+<span class="kw">let</span> provider = OpenAiProvider::new(std::env::var(<span class="str">"OPENAI_API_KEY"</span>)?);
+
+<span class="kw">let</span> agent = AgentBuilder::new(memory)
+    .provider(provider)
+    .role(<span class="str">"Senior Rust Developer"</span>)
+    .goal(<span class="str">"Write correct, idiomatic Rust code"</span>)
+    .backstory(<span class="str">"You have 10 years of Rust experience."</span>)
+    .tool(WeatherTool)
+    .tool(SearchTool)
+    .max_iterations(<span class="num">10</span>)
+    .build()?;</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Running an Agent</h3>
+    <p>Call <code>run()</code> with a prompt. The agent will reason, call tools, and iterate until it produces a final answer.</p>
+<pre><code><span class="kw">let</span> output = agent
+    .run(<span class="str">"What's the weather in Tokyo and what should I wear?"</span>)
+    .<span class="kw">await</span>?;
+
+<span class="fn">println!</span>(<span class="str">"Agent response: {}"</span>, output.content);
+<span class="fn">println!</span>(<span class="str">"Iterations used: {:?}"</span>, output.iterations);</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Streaming Agent Events</h3>
+    <p>Watch the agent's reasoning steps and tool calls in real time.</p>
+<pre><code><span class="kw">let mut</span> stream = agent.stream(<span class="str">"Analyze this codebase"</span>);
+
+<span class="kw">while let</span> Some(event) = stream.next().<span class="kw">await</span> {
+    <span class="kw">match</span> event {
+        Ok(AgentEvent::Thinking(text)) => {
+            <span class="fn">println!</span>(<span class="str">"[Thinking] {}"</span>, text);
+        }
+        Ok(AgentEvent::ToolCall { name, arguments }) => {
+            <span class="fn">println!</span>(<span class="str">"[Tool] {}({})"</span>, name, arguments);
+        }
+        Ok(AgentEvent::ToolResult(result)) => {
+            <span class="fn">println!</span>(<span class="str">"[Result] {}"</span>, result.content);
+        }
+        Ok(AgentEvent::Complete(output)) => {
+            <span class="fn">println!</span>(<span class="str">"[Done] {}"</span>, output.content);
+        }
+        Err(e) => <span class="fn">eprintln!</span>(<span class="str">"Error: {}"</span>, e),
+    }
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Adding Tools Dynamically</h3>
+    <p>Add tools after building with <code>with_tool()</code>.</p>
+<pre><code><span class="kw">let</span> agent = agent
+    .with_tool(CalculatorTool)
+    .with_tool(FileReadTool);</code></pre>
+  </div>
+
+  <div class="callout callout-warn">
+    <span class="callout-icon">&#9888;&#65039;</span>
+    <div><strong>Caution:</strong> Set <code>max_iterations</code> to prevent infinite loops. The agent will return <code>AgentError::MaxIterationsExceeded</code> if it hits the limit.</div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 9. MEMORY ═══════════════════════════════════════════ -->
+<section class="section" id="memory">
+  <div class="section-header">
+    <span class="section-number">09</span>
+    <h2>Memory</h2>
+  </div>
+
+  <p style="color:var(--text-muted);margin-bottom:20px;">
+    Memory backends store conversation history. All implement the <code>Memory</code> trait with <code>add</code>, <code>get</code>, <code>search</code>, and <code>clear</code>.
+  </p>
+
+  <div class="card">
+    <h3>Available Backends</h3>
+    <table class="trait-table">
+      <thead><tr><th>Backend</th><th>Use Case</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>InMemoryMemory</code></td><td>Single session</td><td>Bounded FIFO buffer in memory</td></tr>
+        <tr><td><code>ThreadScopedMemory</code></td><td>Multi-session</td><td>Separate history per thread ID</td></tr>
+        <tr><td><code>SharedMemory</code></td><td>Thread-safe shared</td><td>Arc-wrapped memory for concurrent access</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>InMemoryMemory</h3>
+    <p>The simplest backend. Stores up to N entries in a FIFO buffer.</p>
+<pre><code><span class="kw">use</span> ai_memory::InMemoryMemory;
+
+<span class="kw">let</span> memory = InMemoryMemory::new(<span class="num">50</span>); <span class="cm">// capacity = 50 entries</span>
+
+<span class="cm">// Add entries</span>
+memory.add(MemoryEntry::user(<span class="str">"Hello!"</span>)).<span class="kw">await</span>?;
+memory.add(MemoryEntry::assistant(<span class="str">"Hi! How can I help?"</span>)).<span class="kw">await</span>?;
+
+<span class="cm">// Retrieve all (or limit)</span>
+<span class="kw">let</span> history = memory.get(<span class="kw">Some</span>(<span class="num">10</span>)).<span class="kw">await</span>?;
+
+<span class="cm">// Search (basic text matching)</span>
+<span class="kw">let</span> results = memory.search(<span class="str">"hello"</span>, <span class="num">5</span>).<span class="kw">await</span>?;</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>ThreadScopedMemory</h3>
+    <p>Maintain separate conversation histories per thread or session.</p>
+<pre><code><span class="kw">use</span> ai_memory::ThreadScopedMemory;
+
+<span class="kw">let</span> memory = ThreadScopedMemory::new(<span class="num">100</span>);
+
+<span class="cm">// Add to a specific thread</span>
+memory.add_to_thread(<span class="str">"session-1"</span>, MemoryEntry::user(<span class="str">"Hello"</span>)).<span class="kw">await</span>?;
+memory.add_to_thread(<span class="str">"session-2"</span>, MemoryEntry::user(<span class="str">"Hi"</span>)).<span class="kw">await</span>?;
+
+<span class="cm">// Get history for a specific thread</span>
+<span class="kw">let</span> history = memory.get_thread(<span class="str">"session-1"</span>, <span class="kw">None</span>).<span class="kw">await</span>?;</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>The Memory Trait</h3>
+<pre><code><span class="attr">#[async_trait]</span>
+<span class="kw">pub trait</span> <span class="ty">Memory</span>: Send + Sync {
+    <span class="kw">async fn</span> <span class="fn">add</span>(&amp;<span class="kw">self</span>, entry: MemoryEntry) -> Result&lt;(), MemoryError&gt;;
+    <span class="kw">async fn</span> <span class="fn">get</span>(&amp;<span class="kw">self</span>, limit: Option&lt;usize&gt;) -> Result&lt;Vec&lt;MemoryEntry&gt;, MemoryError&gt;;
+    <span class="kw">async fn</span> <span class="fn">search</span>(&amp;<span class="kw">self</span>, query: &amp;<span class="ty">str</span>, limit: usize) -> Result&lt;Vec&lt;MemoryEntry&gt;, MemoryError&gt;;
+    <span class="kw">async fn</span> <span class="fn">clear</span>(&amp;<span class="kw">self</span>) -> Result&lt;(), MemoryError&gt;;
+}</code></pre>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 10. TEMPLATES ═══════════════════════════════════════════ -->
+<section class="section" id="templates">
+  <div class="section-header">
+    <span class="section-number">10</span>
+    <h2>Templates</h2>
+  </div>
+
+  <p style="color:var(--text-muted);margin-bottom:20px;">
+    The built-in template engine (powered by Tera) lets you compose prompts with variable interpolation and built-in agent templates.
+  </p>
+
+  <div class="card">
+    <h3>Using Templates</h3>
+<pre><code><span class="kw">use</span> ai_core::template::TemplateEngine;
+<span class="kw">use</span> std::collections::HashMap;
+
+<span class="kw">let mut</span> engine = TemplateEngine::new()?;
+
+<span class="cm">// Add a custom template</span>
+engine.add_template(<span class="str">"greeting"</span>,
+    <span class="str">"Hello {{ name }}! You are {{ role }}."</span>
+)?;
+
+<span class="cm">// Render with variables</span>
+<span class="kw">let mut</span> ctx = HashMap::new();
+ctx.insert(<span class="str">"name"</span>.to_string(), json!(<span class="str">"Alice"</span>));
+ctx.insert(<span class="str">"role"</span>.to_string(), json!(<span class="str">"admin"</span>));
+
+<span class="kw">let</span> rendered = engine.render(<span class="str">"greeting"</span>, &amp;ctx)?;
+<span class="cm">// "Hello Alice! You are admin."</span></code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Built-in Agent Templates</h3>
+    <p>The engine ships with ready-made system prompt templates for common agent personas.</p>
+    <table class="trait-table">
+      <thead><tr><th>Template Name</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>agent_default</code></td><td>General-purpose assistant</td></tr>
+        <tr><td><code>agent_coder</code></td><td>Code generation and review</td></tr>
+        <tr><td><code>agent_researcher</code></td><td>Research and analysis tasks</td></tr>
+        <tr><td><code>agent_writer</code></td><td>Content creation</td></tr>
+      </tbody>
+    </table>
+<pre><code><span class="cm">// Use a built-in template</span>
+<span class="kw">let</span> prompt = engine.render_builtin(<span class="str">"agent_coder"</span>, &amp;ctx)?;</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Loading from a Directory</h3>
+<pre><code><span class="kw">let mut</span> engine = TemplateEngine::with_templates_dir(<span class="str">"templates/"</span>)?;
+<span class="cm">// Loads all .tera / .txt files from the directory</span></code></pre>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 11. CONFIGURATION ═══════════════════════════════════════════ -->
+<section class="section" id="configuration">
+  <div class="section-header">
+    <span class="section-number">11</span>
+    <h2>Configuration</h2>
+  </div>
+
+  <p style="color:var(--text-muted);margin-bottom:20px;">
+    The framework supports layered configuration: defaults, config files, environment variables, and code overrides.
+  </p>
+
+  <div class="card">
+    <h3>Loading Configuration</h3>
+<pre><code><span class="kw">use</span> ai_core::config::FrameworkConfig;
+
+<span class="cm">// Auto-load from file + environment</span>
+<span class="kw">let</span> config = FrameworkConfig::load()?;
+
+<span class="cm">// Load from a specific file</span>
+<span class="kw">let</span> config = FrameworkConfig::load_from_path(<span class="str">"config.toml"</span>)?;
+
+<span class="cm">// Validate all settings</span>
+config.validate()?;</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Programmatic Configuration</h3>
+<pre><code><span class="kw">use</span> ai_core::config::{FrameworkConfig, ProviderConfig};
+
+<span class="kw">let</span> config = FrameworkConfig::default()
+    .with_default_provider(<span class="str">"openai"</span>)
+    .with_default_model(<span class="str">"gpt-4"</span>)
+    .with_provider(<span class="str">"openai"</span>, ProviderConfig {
+        api_key_env: <span class="str">"OPENAI_API_KEY"</span>.to_string(),
+        base_url: <span class="str">"https://api.openai.com/v1"</span>.to_string(),
+        default_model: <span class="kw">Some</span>(<span class="str">"gpt-4"</span>.to_string()),
+    });</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Config File Format</h3>
+    <div class="code-label"><span>TOML</span></div>
+<pre><code><span class="str">default_provider</span> = <span class="str">"openai"</span>
+<span class="str">default_model</span> = <span class="str">"gpt-4"</span>
+<span class="str">logging_level</span> = <span class="str">"info"</span>
+
+<span class="str">[providers.openai]</span>
+<span class="str">api_key_env</span> = <span class="str">"OPENAI_API_KEY"</span>
+<span class="str">base_url</span> = <span class="str">"https://api.openai.com/v1"</span>
+
+<span class="str">[providers.anthropic]</span>
+<span class="str">api_key_env</span> = <span class="str">"ANTHROPIC_API_KEY"</span>
+<span class="str">base_url</span> = <span class="str">"https://api.anthropic.com"</span>
+
+<span class="str">[agent]</span>
+<span class="str">max_iterations</span> = <span class="num">10</span></code></pre>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ 12. ERROR HANDLING ═══════════════════════════════════════════ -->
+<section class="section" id="errors">
+  <div class="section-header">
+    <span class="section-number">12</span>
+    <h2>Error Handling</h2>
+  </div>
+
+  <p style="color:var(--text-muted);margin-bottom:20px;">
+    All errors are typed with <code>thiserror</code> and provide structured context for debugging.
+  </p>
+
+  <div class="card">
+    <h3>Error Types</h3>
+    <table class="trait-table">
+      <thead><tr><th>Error Type</th><th>Source</th><th>Common Variants</th></tr></thead>
+      <tbody>
+        <tr><td><code>ProviderError</code></td><td>Provider operations</td><td><code>Api { status, body }</code>, <code>Auth</code>, <code>RateLimit</code>, <code>Timeout</code></td></tr>
+        <tr><td><code>AgentError</code></td><td>Agent execution</td><td><code>MaxIterationsExceeded</code>, <code>Provider(..)</code>, <code>Tool(..)</code></td></tr>
+        <tr><td><code>ToolError</code></td><td>Tool execution</td><td><code>Execution(msg)</code>, <code>NotFound</code>, <code>InvalidInput</code></td></tr>
+        <tr><td><code>MemoryError</code></td><td>Memory operations</td><td><code>Full</code>, <code>NotFound</code>, <code>Io(..)</code></td></tr>
+        <tr><td><code>StructuredOutputError</code></td><td>Structured output</td><td><code>Validation(msg)</code>, <code>MaxRetriesExceeded</code>, <code>JsonParse(..)</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Handling Errors</h3>
+<pre><code><span class="kw">use</span> ai_core::error::ProviderError;
+
+<span class="kw">match</span> client.complete(messages).<span class="kw">await</span> {
+    Ok(response) => <span class="fn">println!</span>(<span class="str">"{}"</span>, response.content),
+    Err(ProviderError::Api { status, body }) => {
+        <span class="fn">eprintln!</span>(<span class="str">"API error {}: {}"</span>, status, body);
+    }
+    Err(ProviderError::RateLimit { retry_after }) => {
+        <span class="fn">eprintln!</span>(<span class="str">"Rate limited. Retry after {:?}s"</span>, retry_after);
+    }
+    Err(ProviderError::Timeout) => {
+        <span class="fn">eprintln!</span>(<span class="str">"Request timed out"</span>);
+    }
+    Err(e) => <span class="fn">eprintln!</span>(<span class="str">"Unexpected error: {}"</span>, e),
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>Agent Error Handling</h3>
+<pre><code><span class="kw">use</span> ai_agent::AgentError;
+
+<span class="kw">match</span> agent.run(<span class="str">"Do something complex"</span>).<span class="kw">await</span> {
+    Ok(output) => <span class="fn">println!</span>(<span class="str">"{}"</span>, output.content),
+    Err(AgentError::MaxIterationsExceeded) => {
+        <span class="fn">eprintln!</span>(<span class="str">"Agent could not complete in time"</span>);
+    }
+    Err(AgentError::Provider(e)) => {
+        <span class="fn">eprintln!</span>(<span class="str">"Provider error: {}"</span>, e);
+    }
+    Err(AgentError::Tool(e)) => {
+        <span class="fn">eprintln!</span>(<span class="str">"Tool error: {}"</span>, e);
+    }
+    Err(e) => <span class="fn">eprintln!</span>(<span class="str">"Agent error: {}"</span>, e),
+}</code></pre>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════ FOOTER ═══════════════════════════════════════════ -->
+<footer>
+  <p>Rust AI Framework &mdash; Phase 1 Documentation</p>
+</footer>
+
+</div>
+
+<script>
+  // Theme toggle
+  function toggleTheme() {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    html.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
+    localStorage.setItem('theme', html.getAttribute('data-theme'));
+  }
+
+  // Restore theme
+  (function() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+  })();
+
+  // Back to top
+  const btn = document.getElementById('backTop');
+  window.addEventListener('scroll', () => {
+    btn.classList.toggle('visible', window.scrollY > 400);
+  });
+</script>
+
+</body>
+</html>
