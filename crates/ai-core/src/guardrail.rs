@@ -33,6 +33,18 @@ use async_trait::async_trait;
 
 use crate::error::GuardrailError;
 
+// ── Leak-detection constants ────────────────────────────────────────────────
+
+/// Default minimum character length for a system-prompt substring to be
+/// considered a leak.  Substrings shorter than this are too common to signal
+/// a genuine leak without producing excessive false positives.
+const DEFAULT_LEAK_DETECTION_MIN_LEN: usize = 20;
+
+/// Minimum word-window size used during phrase extraction.  A value of 2
+/// means single-word matches are excluded from leak detection, which
+/// prevents common single words in the system prompt from triggering alerts.
+const MIN_PHRASE_WORD_COUNT: usize = 2;
+
 // ── Injection patterns ──────────────────────────────────────────────────────
 
 /// Lower-cased substrings that are characteristic of prompt injection attempts.
@@ -142,7 +154,7 @@ impl PromptInjectionGuard {
         Self {
             extra_patterns: Vec::new(),
             system_prompt: None,
-            leak_detection_min_len: 20,
+            leak_detection_min_len: DEFAULT_LEAK_DETECTION_MIN_LEN,
         }
     }
 
@@ -190,6 +202,12 @@ impl PromptInjectionGuard {
 
     /// Return the first system-prompt phrase (≥ `min_len` chars) found
     /// verbatim in `text_lower`, or `None`.
+    ///
+    /// Uses a character-level sliding window over the lower-cased system
+    /// prompt to build candidate phrases, then checks each against
+    /// `text_lower` with a single `contains` call.  This is O(n·m) in the
+    /// lengths of the system prompt (n) and the output (m), avoiding the
+    /// O(n³) cost of the word-window approach.
     fn find_system_prompt_leak(&self, text_lower: &str) -> Option<String> {
         let system_prompt = match &self.system_prompt {
             Some(p) => p,
@@ -197,21 +215,57 @@ impl PromptInjectionGuard {
         };
 
         let system_lower = system_prompt.to_lowercase();
+        let sys_chars: Vec<char> = system_lower.chars().collect();
+        let total = sys_chars.len();
 
-        // Split the system prompt into words and build sliding windows of
-        // increasing lengths to find the longest verbatim match.
-        let words: Vec<&str> = system_lower.split_whitespace().collect();
+        if total < self.leak_detection_min_len {
+            return None;
+        }
 
-        // Try windows of decreasing size (down to `min_len` characters) so
-        // that we catch multi-word leaks.
-        for window_size in (2..=words.len()).rev() {
-            for window in words.windows(window_size) {
-                let phrase = window.join(" ");
-                if phrase.len() >= self.leak_detection_min_len
-                    && text_lower.contains(phrase.as_str())
-                {
-                    return Some(phrase);
-                }
+        // Slide a window of exactly `leak_detection_min_len` characters over
+        // the system prompt and test each substring.  We use character indices
+        // to correctly handle multi-byte UTF-8 code points.
+        //
+        // We also require the phrase to start on a word boundary (preceded by
+        // a non-alphanumeric char or the start of the string) to avoid
+        // matching partial words and generating false positives.
+        let min_len = self.leak_detection_min_len;
+        let char_boundaries: Vec<usize> = system_lower
+            .char_indices()
+            .map(|(i, _)| i)
+            .collect();
+
+        for start_char_idx in 0..=(total.saturating_sub(min_len)) {
+            // Require that the phrase begins at a word boundary.
+            let is_word_boundary = start_char_idx == 0 || {
+                let prev = sys_chars[start_char_idx - 1];
+                !prev.is_alphanumeric()
+            };
+            if !is_word_boundary {
+                continue;
+            }
+
+            // Require at least MIN_PHRASE_WORD_COUNT words in the window.
+            let end_char_idx = (start_char_idx + min_len).min(total);
+            let window_chars = &sys_chars[start_char_idx..end_char_idx];
+            let word_count = window_chars
+                .split(|c: &char| c.is_whitespace())
+                .filter(|s| !s.is_empty())
+                .count();
+            if word_count < MIN_PHRASE_WORD_COUNT {
+                continue;
+            }
+
+            let byte_start = char_boundaries[start_char_idx];
+            let byte_end = if end_char_idx < char_boundaries.len() {
+                char_boundaries[end_char_idx]
+            } else {
+                system_lower.len()
+            };
+            let phrase = &system_lower[byte_start..byte_end];
+
+            if text_lower.contains(phrase) {
+                return Some(phrase.to_string());
             }
         }
         None
