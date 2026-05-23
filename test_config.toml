@@ -1,0 +1,6 @@
+default_provider = "anthropic"
+default_model = "claude-3-opus-20240229"
+
+[agent]
+max_iterations = 20
+default_temperature = 0.9

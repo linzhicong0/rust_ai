@@ -54,11 +54,11 @@ pub mod pipeline;
 pub mod step;
 
 // Re-export main types for convenience
-pub use pipeline::{Pipeline, PipelineBuilder};
+pub use pipeline::{Pipeline, PipelineBuilder, TrackedTaskOutput};
 pub use context::PipelineContext;
 pub use step::{
     Step, StepKind, Condition, LoopCondition,
-    Task, TaskBuilder, RetryPolicy, BackoffStrategy, TaskValidationError,
+    Task, TaskBuilder, RetryPolicy, BackoffStrategy, TaskErrorPolicy, TaskValidationError,
 };
 
 // Re-export error from ai-core

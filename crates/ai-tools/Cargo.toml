@@ -13,3 +13,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tempfile = "3"
+urlencoding = "2"
+uuid = { workspace = true }
+futures = { workspace = true }

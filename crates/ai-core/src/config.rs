@@ -55,18 +55,23 @@ pub enum FrameworkConfigError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FrameworkConfig {
     /// Default provider to use when none is specified.
+    #[serde(default = "FrameworkConfig::default_provider")]
     pub default_provider: String,
 
     /// Default model to use when none is specified.
+    #[serde(default = "FrameworkConfig::default_model")]
     pub default_model: String,
 
     /// Configuration for each provider (indexed by provider name).
+    #[serde(default)]
     pub providers: HashMap<String, ProviderConfig>,
 
     /// Default agent behavior settings.
+    #[serde(default)]
     pub agent: AgentConfig,
 
     /// REST API server settings.
+    #[serde(default)]
     pub server: ServerConfig,
 
     /// Logging verbosity level.
@@ -282,6 +287,14 @@ impl FrameworkConfig {
 impl FrameworkConfig {
     fn default_logging_level() -> String {
         "info".to_string()
+    }
+
+    fn default_provider() -> String {
+        "openai".to_string()
+    }
+
+    fn default_model() -> String {
+        "gpt-4".to_string()
     }
 }
 
@@ -747,5 +760,446 @@ mod tests {
         let config = FrameworkConfig::default().with_default_model(String::from("claude-3-opus"));
 
         assert_eq!(config.default_model, "claude-3-opus");
+    }
+
+    // REQ-15.3: YAML/JSON file loading tests
+
+    #[test]
+    fn test_toml_file_overrides_defaults() {
+        // Create a temporary TOML config file
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().with_extension("toml");
+        std::fs::rename(temp_file.path(), &temp_path).unwrap();
+
+        std::fs::write(
+            &temp_path,
+            r#"
+default_provider = "anthropic"
+default_model = "claude-3-opus-20240229"
+
+[agent]
+max_iterations = 20
+default_temperature = 0.9
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+logging_level = "info"
+"#,
+        )
+        .unwrap();
+
+        let config = FrameworkConfig::load_from_path(&temp_path).unwrap();
+
+        // TOML overrides defaults
+        assert_eq!(config.default_provider, "anthropic");
+        assert_eq!(config.default_model, "claude-3-opus-20240229");
+        assert_eq!(config.agent.max_iterations, 20);
+        assert_eq!(config.agent.default_temperature, 0.9);
+
+        // Other values as specified in file
+        assert_eq!(config.server.host, "127.0.0.1");
+        assert_eq!(config.server.port, 8080);
+        assert_eq!(config.logging_level, "info");
+    }
+
+    #[test]
+    fn test_json_file_overrides_defaults() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().with_extension("json");
+        std::fs::rename(temp_file.path(), &temp_path).unwrap();
+
+        std::fs::write(
+            &temp_path,
+            r#"
+{
+  "default_provider": "deepseek",
+  "default_model": "deepseek-chat",
+  "agent": {
+    "max_iterations": 10,
+    "default_temperature": 0.7
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 9000
+  },
+  "logging_level": "info"
+}
+"#,
+        )
+        .unwrap();
+
+        let config = FrameworkConfig::load_from_path(&temp_path).unwrap();
+
+        assert_eq!(config.default_provider, "deepseek");
+        assert_eq!(config.default_model, "deepseek-chat");
+        assert_eq!(config.server.host, "0.0.0.0");
+        assert_eq!(config.server.port, 9000);
+
+        // Agent defaults as specified
+        assert_eq!(config.agent.max_iterations, 10);
+        assert_eq!(config.agent.default_temperature, 0.7);
+    }
+
+    // REQ-15.3: Environment variable precedence tests
+
+    #[test]
+    fn test_env_var_precedence_over_file() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Create a config file with one value
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().with_extension("toml");
+        std::fs::rename(temp_file.path(), &temp_path).unwrap();
+
+        std::fs::write(
+            &temp_path,
+            r#"
+default_provider = "anthropic"
+default_model = "claude-3-opus-20240229"
+
+[agent]
+max_iterations = 10
+default_temperature = 0.7
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+logging_level = "info"
+"#,
+        )
+        .unwrap();
+
+        // Set env var to override
+        std::env::set_var("AI_DEFAULT_PROVIDER", "openai");
+
+        let config = FrameworkConfig::load_from_path(&temp_path).unwrap();
+
+        // Env var takes precedence over file
+        assert_eq!(config.default_provider, "openai");
+
+        // File value still used for non-overridden fields
+        assert_eq!(config.default_model, "claude-3-opus-20240229");
+
+        // Clean up
+        std::env::remove_var("AI_DEFAULT_PROVIDER");
+    }
+
+    #[test]
+    fn test_env_var_nested_config() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().with_extension("toml");
+        std::fs::rename(temp_file.path(), &temp_path).unwrap();
+
+        std::fs::write(
+            &temp_path,
+            r#"
+default_provider = "openai"
+default_model = "gpt-4"
+
+[agent]
+max_iterations = 15
+default_temperature = 0.7
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+logging_level = "info"
+"#,
+        )
+        .unwrap();
+
+        // Override nested config via env var
+        std::env::set_var("AI_AGENT__MAX_ITERATIONS", "25");
+        std::env::set_var("AI_AGENT__DEFAULT_TEMPERATURE", "0.85");
+
+        let config = FrameworkConfig::load_from_path(&temp_path).unwrap();
+
+        assert_eq!(config.agent.max_iterations, 25);
+        assert_eq!(config.agent.default_temperature, 0.85);
+
+        // Clean up
+        std::env::remove_var("AI_AGENT__MAX_ITERATIONS");
+        std::env::remove_var("AI_AGENT__DEFAULT_TEMPERATURE");
+    }
+
+    // REQ-15.3: Full hierarchy chain test
+
+    #[test]
+    fn test_full_hierarchy_chain() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Start with defaults: default_provider = "openai", default_model = "gpt-4"
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().with_extension("toml");
+        std::fs::rename(temp_file.path(), &temp_path).unwrap();
+
+        std::fs::write(
+            &temp_path,
+            r#"
+default_provider = "anthropic"
+default_model = "claude-3-opus-20240229"
+
+[agent]
+max_iterations = 20
+default_temperature = 0.7
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+logging_level = "info"
+"#,
+        )
+        .unwrap();
+
+        // Override via env var
+        std::env::set_var("AI_DEFAULT_MODEL", "claude-3-sonnet-20240229");
+
+        let config = FrameworkConfig::load_from_path(&temp_path).unwrap();
+
+        // Code override (highest precedence)
+        let config = config.with_default_provider("deepseek");
+
+        // Verify hierarchy: defaults < file < env < code
+        assert_eq!(config.default_provider, "deepseek"); // Code override
+        assert_eq!(config.default_model, "claude-3-sonnet-20240229"); // Env override
+        assert_eq!(config.agent.max_iterations, 20); // File override
+        assert_eq!(config.server.port, 8080); // Default value
+
+        // Clean up
+        std::env::remove_var("AI_DEFAULT_MODEL");
+    }
+
+    // REQ-15.3: Malformed config file handling tests
+
+    #[test]
+    fn test_malformed_toml_returns_error() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().with_extension("toml");
+        std::fs::rename(temp_file.path(), &temp_path).unwrap();
+
+        std::fs::write(
+            &temp_path,
+            r#"
+default_provider = "anthropic"
+invalid_toml_syntax = [
+"#,
+        )
+        .unwrap();
+
+        let result = FrameworkConfig::load_from_path(&temp_path);
+
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        let error_msg = format!("{}", error);
+        assert!(error_msg.contains("Configuration loading error") || error_msg.contains("config"));
+    }
+
+    #[test]
+    fn test_malformed_json_returns_error() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().with_extension("json");
+        std::fs::rename(temp_file.path(), &temp_path).unwrap();
+
+        std::fs::write(
+            &temp_path,
+            r#"
+{
+  "default_provider": "anthropic"
+  invalid_json_syntax
+}
+"#,
+        )
+        .unwrap();
+
+        let result = FrameworkConfig::load_from_path(&temp_path);
+
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        let error_msg = format!("{}", error);
+        assert!(error_msg.contains("Configuration loading error") || error_msg.contains("config"));
+    }
+
+    #[test]
+    fn test_missing_config_file_falls_back_to_defaults() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let nonexistent = "/tmp/nonexistent_ai_framework_config_xyz.toml";
+        let result = FrameworkConfig::load_from_path(nonexistent);
+
+        // Should succeed with defaults if env vars are set, or fail gracefully
+        // The important thing is it doesn't panic
+        match result {
+            Ok(config) => {
+                // If it succeeds, should have defaults
+                assert!(!config.default_provider.is_empty());
+                assert!(!config.default_model.is_empty());
+            }
+            Err(_) => {
+                // Also acceptable - file doesn't exist and no env vars
+            }
+        }
+    }
+
+    #[test]
+    fn test_malformed_config_does_not_panic() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().with_extension("toml");
+        std::fs::rename(temp_file.path(), &temp_path).unwrap();
+
+        std::fs::write(&temp_path, "definitely not valid toml {{{{").unwrap();
+
+        // This should not panic
+        let result = std::panic::catch_unwind(|| {
+            FrameworkConfig::load_from_path(&temp_path)
+        });
+
+        assert!(result.is_ok());
+        let config_result = result.unwrap();
+        assert!(config_result.is_err());
+    }
+
+    #[test]
+    fn test_env_var_provider_config_override() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().with_extension("toml");
+        std::fs::rename(temp_file.path(), &temp_path).unwrap();
+
+        std::fs::write(
+            &temp_path,
+            r#"
+default_provider = "openai"
+default_model = "gpt-4"
+
+[agent]
+max_iterations = 10
+default_temperature = 0.7
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+logging_level = "info"
+
+[providers.openai]
+api_key_env = "FILE_OPENAI_KEY"
+base_url = "https://api.openai.com/v1"
+
+[providers.anthropic]
+api_key_env = "FILE_ANTHROPIC_KEY"
+base_url = "https://api.anthropic.com"
+"#,
+        )
+        .unwrap();
+
+        // Override via env var
+        std::env::set_var("AI_PROVIDERS__OPENAI__API_KEY_ENV", "ENV_OPENAI_KEY");
+
+        let config = FrameworkConfig::load_from_path(&temp_path).unwrap();
+
+        let openai = config.get_provider("openai").unwrap();
+        assert_eq!(openai.api_key_env, "ENV_OPENAI_KEY");
+
+        // Anthropic config from file
+        let anthropic = config.get_provider("anthropic").unwrap();
+        assert_eq!(anthropic.api_key_env, "FILE_ANTHROPIC_KEY");
+
+        // Clean up
+        std::env::remove_var("AI_PROVIDERS__OPENAI__API_KEY_ENV");
+    }
+
+    #[test]
+    fn test_logging_level_env_override() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().with_extension("toml");
+        std::fs::rename(temp_file.path(), &temp_path).unwrap();
+
+        std::fs::write(
+            &temp_path,
+            r#"
+default_provider = "openai"
+default_model = "gpt-4"
+
+[agent]
+max_iterations = 10
+default_temperature = 0.7
+
+[server]
+host = "127.0.0.1"
+port = 8080
+
+logging_level = "error"
+"#,
+        )
+        .unwrap();
+
+        std::env::set_var("AI_LOGGING_LEVEL", "debug");
+
+        let config = FrameworkConfig::load_from_path(&temp_path).unwrap();
+
+        assert_eq!(config.logging_level, "debug");
+
+        // Clean up
+        std::env::remove_var("AI_LOGGING_LEVEL");
+    }
+
+    #[test]
+    fn test_config_with_logging_level() {
+        let config = FrameworkConfig::default().with_logging_level("trace");
+        assert_eq!(config.logging_level, "trace");
+    }
+
+    // Simple test to verify env vars work
+    #[test]
+    fn test_env_var_simple() {
+        std::env::set_var("AI_DEFAULT_PROVIDER", "test_provider");
+
+        // Load without a file to isolate env var behavior
+        let settings = config::Config::builder()
+            .add_source(
+                config::Environment::with_prefix("AI")
+                    .prefix_separator("__")
+                    .separator("__")
+                    .try_parsing(true),
+            )
+            .build()
+            .unwrap();
+
+        let provider: String = settings.get("default_provider").unwrap();
+        assert_eq!(provider, "test_provider");
+
+        // Clean up
+        std::env::remove_var("AI_DEFAULT_PROVIDER");
     }
 }

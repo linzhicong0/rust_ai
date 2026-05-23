@@ -97,6 +97,26 @@ impl RetryPolicy {
     }
 }
 
+/// Error handling policy for a task after retries are exhausted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskErrorPolicy {
+    /// Stop the pipeline and return the error.
+    Halt,
+
+    /// Record error context and continue without producing task output.
+    Skip,
+
+    /// Retry the task with a fallback agent name.
+    FallbackAgent(String),
+}
+
+impl TaskErrorPolicy {
+    /// Create a fallback policy that reruns the task with another agent.
+    pub fn fallback(agent_name: impl Into<String>) -> Self {
+        Self::FallbackAgent(agent_name.into())
+    }
+}
+
 /// A task definition with full configuration.
 ///
 /// Tasks represent the basic unit of work in a pipeline, executing
@@ -127,6 +147,9 @@ pub struct Task {
 
     /// Optional retry policy for this task.
     pub retry_policy: Option<RetryPolicy>,
+
+    /// Optional error policy for this task after retries are exhausted.
+    pub error_policy: Option<TaskErrorPolicy>,
 }
 
 impl Task {
@@ -145,6 +168,7 @@ impl Task {
             dependencies: Vec::new(),
             timeout: None,
             retry_policy: None,
+            error_policy: None,
         }
     }
 
@@ -166,6 +190,11 @@ impl Task {
         self
     }
 
+    /// Add a dependency on another task.
+    pub fn depends_on(self, dep: impl Into<String>) -> Self {
+        self.with_dependency(dep)
+    }
+
     /// Set multiple dependencies.
     pub fn with_dependencies(mut self, deps: Vec<String>) -> Self {
         self.dependencies = deps;
@@ -181,6 +210,12 @@ impl Task {
     /// Set the retry policy for this task.
     pub fn with_retry_policy(mut self, policy: RetryPolicy) -> Self {
         self.retry_policy = Some(policy);
+        self
+    }
+
+    /// Set the error policy for this task.
+    pub fn with_error_policy(mut self, policy: TaskErrorPolicy) -> Self {
+        self.error_policy = Some(policy);
         self
     }
 
@@ -334,6 +369,11 @@ impl TaskBuilder {
         self
     }
 
+    /// Add a dependency on another task.
+    pub fn depends_on(self, dep: impl Into<String>) -> Self {
+        self.dependency(dep)
+    }
+
     /// Set multiple dependencies at once.
     ///
     /// # Example
@@ -375,6 +415,12 @@ impl TaskBuilder {
     /// ```
     pub fn retry_policy(mut self, policy: RetryPolicy) -> Self {
         self.inner.retry_policy = Some(policy);
+        self
+    }
+
+    /// Set the error policy for this task.
+    pub fn error_policy(mut self, policy: TaskErrorPolicy) -> Self {
+        self.inner.error_policy = Some(policy);
         self
     }
 
@@ -873,7 +919,10 @@ mod tests {
         assert_eq!(task.input_key, "in");
         assert_eq!(task.output_key, "out");
         assert_eq!(task.description, Some("Test task".to_string()));
-        assert_eq!(task.expected_output, Some(serde_json::json!({"status": "ok"})));
+        assert_eq!(
+            task.expected_output,
+            Some(serde_json::json!({"status": "ok"}))
+        );
         assert_eq!(task.dependencies, vec!["task1", "task2"]);
         assert_eq!(task.timeout, Some(Duration::from_secs(30)));
         assert!(task.retry_policy.is_some());
@@ -882,7 +931,11 @@ mod tests {
     #[test]
     fn test_task_builder_dependencies_vec() {
         let task = TaskBuilder::new("agent", "in", "out")
-            .dependencies(vec!["task1".to_string(), "task2".to_string(), "task3".to_string()])
+            .dependencies(vec![
+                "task1".to_string(),
+                "task2".to_string(),
+                "task3".to_string(),
+            ])
             .build()
             .unwrap();
 
@@ -935,7 +988,10 @@ mod tests {
     fn test_retry_policy_fixed() {
         let policy = RetryPolicy::fixed(5, 1000);
         assert_eq!(policy.max_retries, 5);
-        assert_eq!(policy.backoff, BackoffStrategy::Fixed(Duration::from_millis(1000)));
+        assert_eq!(
+            policy.backoff,
+            BackoffStrategy::Fixed(Duration::from_millis(1000))
+        );
         assert_eq!(policy.delay_for(0), Some(Duration::from_millis(1000)));
         assert_eq!(policy.delay_for(4), Some(Duration::from_millis(1000)));
         assert_eq!(policy.delay_for(5), None);

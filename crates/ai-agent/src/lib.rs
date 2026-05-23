@@ -49,5 +49,5 @@ pub mod planner;
 
 pub use agent::Agent;
 pub use builder::AgentBuilder;
-pub use delegate::DelegateTool;
+pub use delegate::{DelegateTool, DelegationWorker};
 pub use planner::{Plan, PlanResult, PlanStep, PlanStepStatus};

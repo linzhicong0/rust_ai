@@ -131,11 +131,24 @@ impl OpenAiProvider {
                     .into_iter()
                     .map(|p| match p {
                         ContentPart::Text(t) => OpenAiContentPart::Text { text: t },
-                        ContentPart::Image { url, media_type } => {
+                        ContentPart::Image { url, media_type, detail } => {
                             OpenAiContentPart::ImageUrl {
                                 image_url: OpenAiImageUrl {
                                     url,
-                                    detail: Some("auto".to_string()),
+                                    detail: detail.or(Some("auto".to_string())),
+                                },
+                            }
+                        }
+                        ContentPart::ImageBytes { data, media_type, detail } => {
+                            // Convert bytes to base64 data URL
+                            use base64::prelude::*;
+                            let base64 = BASE64_STANDARD.encode(&data);
+                            let data_url = format!("data:{};base64,{}", media_type, base64);
+
+                            OpenAiContentPart::ImageUrl {
+                                image_url: OpenAiImageUrl {
+                                    url: data_url,
+                                    detail: detail.or(Some("auto".to_string())),
                                 },
                             }
                         }
