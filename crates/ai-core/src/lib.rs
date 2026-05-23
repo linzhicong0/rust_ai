@@ -42,6 +42,7 @@ pub use crate::tool::{Tool, ToolDescriptor, ToolOutput};
 pub use crate::memory::{Memory, MemoryEntry, ScopedMemory};
 pub use crate::embedder::Embedder;
 pub use crate::guardrail::Guardrail;
+pub use crate::guardrail::PromptInjectionGuard;
 
 // Re-export configuration
 pub use crate::config::FrameworkConfig;
