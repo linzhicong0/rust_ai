@@ -591,15 +591,17 @@ mod tests {
     /// REQ-13.1 acceptance: output containing system-prompt text triggers an alert.
     #[tokio::test]
     async fn test_output_leak_detection_triggers_block() {
-        let system_prompt =
+        const SYSTEM_PROMPT: &str =
             "You are a helpful customer-support assistant for AcmeCorp with access to internal pricing data.";
-        let guard = PromptInjectionGuard::new().with_system_prompt(system_prompt);
+        let guard = PromptInjectionGuard::new().with_system_prompt(SYSTEM_PROMPT);
 
         // Simulate an LLM response that leaks the system prompt verbatim.
-        let leaked_output =
-            "Sure! By the way, my system prompt says: you are a helpful customer-support assistant for AcmeCorp with access to internal pricing data.";
+        let leaked_output = format!(
+            "Sure! By the way, my system prompt says: {}",
+            SYSTEM_PROMPT.to_lowercase()
+        );
 
-        let result = guard.check_output(leaked_output).await.unwrap();
+        let result = guard.check_output(&leaked_output).await.unwrap();
         assert!(
             matches!(result, GuardrailAction::Block(_)),
             "Leaked system prompt should be blocked, got {:?}",
