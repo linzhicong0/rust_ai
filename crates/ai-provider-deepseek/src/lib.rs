@@ -301,12 +301,23 @@ impl DeepSeekProvider {
                     .into_iter()
                     .map(|part| match part {
                         ContentPart::Text(text) => DeepSeekContentPart::Text { text },
-                        ContentPart::Image { url, .. } => DeepSeekContentPart::ImageUrl {
+                        ContentPart::Image { url, detail, .. } => DeepSeekContentPart::ImageUrl {
                             image_url: DeepSeekImageUrl {
                                 url,
-                                detail: Some("auto".to_string()),
+                                detail: detail.or(Some("auto".to_string())),
                             },
                         },
+                        ContentPart::ImageBytes { data, media_type, detail } => {
+                            use base64::prelude::*;
+                            let base64 = BASE64_STANDARD.encode(&data);
+                            let data_url = format!("data:{};base64,{}", media_type, base64);
+                            DeepSeekContentPart::ImageUrl {
+                                image_url: DeepSeekImageUrl {
+                                    url: data_url,
+                                    detail: detail.or(Some("auto".to_string())),
+                                },
+                            }
+                        }
                     })
                     .collect(),
             ),

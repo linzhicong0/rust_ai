@@ -8,6 +8,7 @@
 use std::sync::Arc;
 
 use ai_core::error::AgentError;
+use ai_core::CostTracker;
 use ai_core::memory::Memory;
 use ai_core::provider::Provider;
 use ai_core::tool::Tool;
@@ -51,12 +52,14 @@ where
 {
     pub(crate) provider: Option<P>,
     pub(crate) memory: M,
+    pub(crate) name: Option<String>,
     pub(crate) role: Option<String>,
     pub(crate) goal: Option<String>,
     pub(crate) backstory: Option<String>,
     pub(crate) tools: Vec<Box<dyn Tool>>,
     pub(crate) model_config: ModelConfig,
     pub(crate) max_iterations: u32,
+    pub(crate) cost_tracker: CostTracker,
     pub(crate) _state: std::marker::PhantomData<(P, State)>,
 }
 
@@ -73,12 +76,14 @@ where
         Self {
             provider: None,
             memory,
+            name: None,
             role: None,
             goal: None,
             backstory: None,
             tools: Vec::new(),
             model_config: ModelConfig::default(),
             max_iterations: 10,
+            cost_tracker: CostTracker::new(),
             _state: std::marker::PhantomData,
         }
     }
@@ -88,6 +93,12 @@ impl<P, M, State> AgentBuilder<P, M, State>
 where
     M: Memory + 'static,
 {
+    /// Set the agent name used for tracking and identification.
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
     /// Set the agent's role description.
     ///
     /// This is included in the system prompt and tells the agent what
@@ -164,6 +175,12 @@ where
         self.model_config = self.model_config.with_temperature(temp);
         self
     }
+
+    /// Override the cost tracker used by this agent.
+    pub fn cost_tracker(mut self, cost_tracker: CostTracker) -> Self {
+        self.cost_tracker = cost_tracker;
+        self
+    }
 }
 
 impl<P, M> AgentBuilder<P, M, NoProvider>
@@ -182,12 +199,14 @@ where
         AgentBuilder {
             provider: Some(provider),
             memory: self.memory,
+            name: self.name,
             role: self.role,
             goal: self.goal,
             backstory: self.backstory,
             tools: self.tools,
             model_config: self.model_config,
             max_iterations: self.max_iterations,
+            cost_tracker: self.cost_tracker,
             _state: std::marker::PhantomData,
         }
     }
@@ -209,12 +228,14 @@ where
         let inner = AgentInner {
             provider,
             memory: self.memory,
+            name: self.name,
             role: self.role,
             goal: self.goal,
             backstory: self.backstory,
             tools: self.tools,
             model_config: self.model_config,
             max_iterations: self.max_iterations,
+            cost_tracker: self.cost_tracker,
         };
 
         Ok(Agent {

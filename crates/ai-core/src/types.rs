@@ -169,7 +169,10 @@ impl ModelConfig {
             top_p: other.top_p.or(self.top_p),
             frequency_penalty: other.frequency_penalty.or(self.frequency_penalty),
             presence_penalty: other.presence_penalty.or(self.presence_penalty),
-            stop_sequences: other.stop_sequences.clone().or_else(|| self.stop_sequences.clone()),
+            stop_sequences: other
+                .stop_sequences
+                .clone()
+                .or_else(|| self.stop_sequences.clone()),
         }
     }
 
@@ -287,6 +290,77 @@ impl Content {
             _ => None,
         }
     }
+
+    /// Get all text parts from multi-part content.
+    pub fn get_text_parts(&self) -> Vec<&str> {
+        match self {
+            Content::Text(s) => vec![s.as_str()],
+            Content::MultiPart(parts) => parts
+                .iter()
+                .filter_map(|p| match p {
+                    ContentPart::Text(s) => Some(s.as_str()),
+                    _ => None,
+                })
+                .collect(),
+        }
+    }
+
+    /// Check if this content contains images.
+    pub fn has_images(&self) -> bool {
+        match self {
+            Content::MultiPart(parts) => parts.iter().any(|p| p.is_image()),
+            _ => false,
+        }
+    }
+
+    /// Get all image parts from this content.
+    pub fn get_images(&self) -> Vec<&ContentPart> {
+        match self {
+            Content::MultiPart(parts) => parts.iter().filter(|p| p.is_image()).collect(),
+            _ => vec![],
+        }
+    }
+
+    /// Convert image bytes to base64 data URL.
+    pub fn encode_image_base64(data: &[u8], media_type: &str) -> String {
+        use base64::prelude::*;
+        format!(
+            "data:{};base64,{}",
+            media_type,
+            BASE64_STANDARD.encode(data)
+        )
+    }
+
+    /// Decode base64 data URL to bytes and media type.
+    pub fn decode_image_data_url(url: &str) -> Result<(Vec<u8>, String), String> {
+        if !url.starts_with("data:") {
+            return Err("Not a data URL".to_string());
+        }
+
+        let parts = url
+            .strip_prefix("data:")
+            .ok_or("Invalid data URL")?
+            .split_once(';')
+            .ok_or("Invalid data URL: missing semicolon")?;
+
+        let media_type = parts.0.to_string();
+        let rest = parts.1;
+
+        if !rest.starts_with("base64,") {
+            return Err("Invalid data URL: not base64".to_string());
+        }
+
+        let base64_data = rest
+            .strip_prefix("base64,")
+            .ok_or("Invalid data URL: missing base64 data")?;
+
+        use base64::prelude::*;
+        let bytes = BASE64_STANDARD
+            .decode(base64_data)
+            .map_err(|e| format!("Failed to decode base64: {}", e))?;
+
+        Ok((bytes, media_type))
+    }
 }
 
 impl From<String> for Content {
@@ -314,11 +388,191 @@ pub enum ContentPart {
 
         /// Media type (e.g., "image/jpeg", "image/png").
         media_type: String,
+
+        /// Optional detail level for vision models ("low", "high", "auto").
+        /// "low" = resized to fit within 512x512, "high" = full resolution
+        #[serde(skip_serializing_if = "Option::is_none")]
+        detail: Option<String>,
+    },
+
+    /// Image from bytes (base64-encoded internally).
+    ImageBytes {
+        /// Raw image bytes (will be base64-encoded).
+        #[serde(skip_serializing)]
+        data: Vec<u8>,
+
+        /// Media type (e.g., "image/jpeg", "image/png").
+        media_type: String,
+
+        /// Optional detail level for vision models.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        detail: Option<String>,
     },
 }
 
+impl ContentPart {
+    /// Create a text part.
+    pub fn text(text: impl Into<String>) -> Self {
+        Self::Text(text.into())
+    }
+
+    /// Create an image part from a URL.
+    pub fn image_url(url: impl Into<String>, media_type: impl Into<String>) -> Self {
+        Self::Image {
+            url: url.into(),
+            media_type: media_type.into(),
+            detail: None,
+        }
+    }
+
+    /// Create an image part from a URL with detail level.
+    pub fn image_url_with_detail(
+        url: impl Into<String>,
+        media_type: impl Into<String>,
+        detail: ImageDetail,
+    ) -> Self {
+        Self::Image {
+            url: url.into(),
+            media_type: media_type.into(),
+            detail: Some(detail.as_str().to_string()),
+        }
+    }
+
+    /// Create an image part from base64 data.
+    pub fn image_base64(base64_data: impl Into<String>, media_type: impl Into<String>) -> Self {
+        let media_type = media_type.into();
+        let data_url = format!("data:{};base64,{}", media_type, base64_data.into());
+        Self::Image {
+            url: data_url,
+            media_type,
+            detail: None,
+        }
+    }
+
+    /// Create an image part from raw bytes.
+    pub fn image_bytes(data: Vec<u8>, media_type: impl Into<String>) -> Self {
+        Self::ImageBytes {
+            data,
+            media_type: media_type.into(),
+            detail: None,
+        }
+    }
+
+    /// Create an image part from raw bytes with detail level.
+    pub fn image_bytes_with_detail(
+        data: Vec<u8>,
+        media_type: impl Into<String>,
+        detail: ImageDetail,
+    ) -> Self {
+        Self::ImageBytes {
+            data,
+            media_type: media_type.into(),
+            detail: Some(detail.as_str().to_string()),
+        }
+    }
+
+    /// Check if this part is an image.
+    pub fn is_image(&self) -> bool {
+        matches!(self, Self::Image { .. } | Self::ImageBytes { .. })
+    }
+
+    /// Get the image URL if this is an image part.
+    pub fn as_image_url(&self) -> Option<&str> {
+        match self {
+            Self::Image { url, .. } => Some(url),
+            Self::ImageBytes { .. } => None,
+            _ => None,
+        }
+    }
+}
+
+/// Detail level for vision models.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImageDetail {
+    /// Low detail (image resized to fit within 512x512).
+    Low,
+
+    /// High detail (full resolution, uses more tokens).
+    High,
+
+    /// Auto detail (model chooses based on image size).
+    Auto,
+}
+
+impl ImageDetail {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::High => "high",
+            Self::Auto => "auto",
+        }
+    }
+}
+
+impl Message {
+    /// Create a user message with multi-part content (text + images).
+    pub fn user_multi(parts: Vec<ContentPart>) -> Self {
+        Self {
+            role: Role::User,
+            content: Content::MultiPart(parts),
+        }
+    }
+
+    /// Create a user message with text and a single image from URL.
+    pub fn user_with_image(
+        text: impl Into<String>,
+        image_url: impl Into<String>,
+        media_type: impl Into<String>,
+    ) -> Self {
+        Self::user_multi(vec![
+            ContentPart::text(text.into()),
+            ContentPart::image_url(image_url, media_type),
+        ])
+    }
+
+    /// Create a user message with text and multiple images.
+    pub fn user_with_images(
+        text: impl Into<String>,
+        images: Vec<(String, String)>, // (url, media_type) pairs
+    ) -> Self {
+        let mut parts = vec![ContentPart::text(text.into())];
+        for (url, media_type) in images {
+            parts.push(ContentPart::image_url(url, media_type));
+        }
+        Self::user_multi(parts)
+    }
+
+    /// Create a user message with text and an image from bytes.
+    pub fn user_with_image_bytes(
+        text: impl Into<String>,
+        image_data: Vec<u8>,
+        media_type: impl Into<String>,
+    ) -> Self {
+        Self::user_multi(vec![
+            ContentPart::text(text.into()),
+            ContentPart::image_bytes(image_data, media_type),
+        ])
+    }
+
+    /// Check if this message contains images.
+    pub fn has_images(&self) -> bool {
+        match &self.content {
+            Content::MultiPart(parts) => parts.iter().any(|p| p.is_image()),
+            _ => false,
+        }
+    }
+
+    /// Get all image parts from this message.
+    pub fn get_images(&self) -> Vec<&ContentPart> {
+        match &self.content {
+            Content::MultiPart(parts) => parts.iter().filter(|p| p.is_image()).collect(),
+            _ => vec![],
+        }
+    }
+}
+
 /// Token usage information from an LLM response.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Usage {
     /// Number of tokens in the prompt.
     pub prompt_tokens: u32,
@@ -339,13 +593,14 @@ impl Usage {
     /// * `completion_price_per_m` — Price per million completion tokens
     pub fn estimated_cost(&self, prompt_price_per_m: f64, completion_price_per_m: f64) -> f64 {
         let prompt_cost = (self.prompt_tokens as f64 / 1_000_000.0) * prompt_price_per_m;
-        let completion_cost = (self.completion_tokens as f64 / 1_000_000.0) * completion_price_per_m;
+        let completion_cost =
+            (self.completion_tokens as f64 / 1_000_000.0) * completion_price_per_m;
         prompt_cost + completion_cost
     }
 }
 
 /// A complete LLM response.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompletionResponse {
     /// The generated text content.
     pub content: String,
@@ -423,6 +678,15 @@ pub enum FinishReason {
 pub struct AgentOutput {
     /// The final content produced by the agent.
     pub content: String,
+
+    /// Total token usage accumulated across the agent run.
+    pub usage: Usage,
+
+    /// Estimated total cost in USD for the agent run.
+    pub estimated_cost: f64,
+
+    /// Scopes updated while tracking this run.
+    pub tracked_scopes: Vec<String>,
 }
 
 /// An event during agent streaming.
@@ -469,8 +733,7 @@ mod tests {
             .with_temperature(0.7)
             .with_max_tokens(1000);
 
-        let override_config = ModelConfig::new("gpt-4")
-            .with_temperature(0.5);
+        let override_config = ModelConfig::new("gpt-4").with_temperature(0.5);
 
         let merged = base.merge_with(&override_config);
 
@@ -482,8 +745,7 @@ mod tests {
 
     #[test]
     fn test_model_config_merge_with_model_override() {
-        let base = ModelConfig::new("gpt-4")
-            .with_temperature(0.7);
+        let base = ModelConfig::new("gpt-4").with_temperature(0.7);
 
         let override_config = ModelConfig::new("claude-3-opus-20240229");
 
@@ -505,8 +767,7 @@ mod tests {
             .with_presence_penalty(0.3)
             .with_stop_sequences(vec!["END".to_string()]);
 
-        let override_config = ModelConfig::new("gpt-4")
-            .with_temperature(0.5);
+        let override_config = ModelConfig::new("gpt-4").with_temperature(0.5);
 
         let merged = base.merge_with(&override_config);
 
@@ -677,6 +938,7 @@ mod tests {
             ContentPart::Image {
                 url: "https://example.com/image.jpg".to_string(),
                 media_type: "image/jpeg".to_string(),
+                detail: None,
             },
         ];
         let content = Content::multi(parts);
@@ -730,5 +992,252 @@ mod tests {
 
         let cost = usage.estimated_cost(10.0, 20.0);
         assert_eq!(cost, 20.0); // $10 for prompts + $10 for completions
+    }
+
+    // REQ-8.1: Image Understanding Tests
+
+    #[test]
+    fn test_content_part_text() {
+        let part = ContentPart::text("Hello, world!");
+        assert!(matches!(part, ContentPart::Text(_)));
+        if let ContentPart::Text(s) = part {
+            assert_eq!(s, "Hello, world!");
+        }
+    }
+
+    #[test]
+    fn test_content_part_image_url() {
+        let part = ContentPart::image_url("https://example.com/image.jpg", "image/jpeg");
+
+        assert!(part.is_image());
+        assert_eq!(part.as_image_url(), Some("https://example.com/image.jpg"));
+
+        if let ContentPart::Image {
+            url,
+            media_type,
+            detail,
+        } = part
+        {
+            assert_eq!(url, "https://example.com/image.jpg");
+            assert_eq!(media_type, "image/jpeg");
+            assert!(detail.is_none());
+        } else {
+            panic!("Expected Image variant");
+        }
+    }
+
+    #[test]
+    fn test_content_part_image_url_with_detail() {
+        let part = ContentPart::image_url_with_detail(
+            "https://example.com/image.jpg",
+            "image/jpeg",
+            ImageDetail::High,
+        );
+
+        assert!(part.is_image());
+
+        if let ContentPart::Image {
+            url,
+            media_type,
+            detail,
+        } = part
+        {
+            assert_eq!(url, "https://example.com/image.jpg");
+            assert_eq!(media_type, "image/jpeg");
+            assert_eq!(detail, Some("high".to_string()));
+        } else {
+            panic!("Expected Image variant");
+        }
+    }
+
+    #[test]
+    fn test_content_part_image_base64() {
+        let base64_data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        let part = ContentPart::image_base64(base64_data, "image/png");
+
+        assert!(part.is_image());
+
+        if let ContentPart::Image {
+            url, media_type, ..
+        } = part
+        {
+            assert!(url.starts_with("data:image/png;base64,"));
+            assert!(url.contains(base64_data));
+            assert_eq!(media_type, "image/png");
+        } else {
+            panic!("Expected Image variant");
+        }
+    }
+
+    #[test]
+    fn test_content_part_image_bytes() {
+        let bytes = vec![0x89, 0x50, 0x4E, 0x47]; // PNG signature
+        let part = ContentPart::image_bytes(bytes.clone(), "image/png");
+
+        assert!(part.is_image());
+
+        if let ContentPart::ImageBytes {
+            data, media_type, ..
+        } = part
+        {
+            assert_eq!(data, bytes);
+            assert_eq!(media_type, "image/png");
+        } else {
+            panic!("Expected ImageBytes variant");
+        }
+    }
+
+    #[test]
+    fn test_image_detail_as_str() {
+        assert_eq!(ImageDetail::Low.as_str(), "low");
+        assert_eq!(ImageDetail::High.as_str(), "high");
+        assert_eq!(ImageDetail::Auto.as_str(), "auto");
+    }
+
+    #[test]
+    fn test_message_user_with_image() {
+        let msg = Message::user_with_image(
+            "What's in this image?",
+            "https://example.com/image.jpg",
+            "image/jpeg",
+        );
+
+        assert!(matches!(msg.role, Role::User));
+        assert!(msg.has_images());
+
+        let images = msg.get_images();
+        assert_eq!(images.len(), 1);
+    }
+
+    #[test]
+    fn test_message_user_with_images() {
+        let images = vec![
+            (
+                "https://example.com/img1.jpg".to_string(),
+                "image/jpeg".to_string(),
+            ),
+            (
+                "https://example.com/img2.png".to_string(),
+                "image/png".to_string(),
+            ),
+        ];
+
+        let msg = Message::user_with_images("Compare these images", images);
+
+        assert!(matches!(msg.role, Role::User));
+        assert!(msg.has_images());
+
+        let images = msg.get_images();
+        assert_eq!(images.len(), 2);
+    }
+
+    #[test]
+    fn test_message_user_with_image_bytes() {
+        let bytes = vec![0x89, 0x50, 0x4E, 0x47];
+        let msg = Message::user_with_image_bytes("What's in this image?", bytes, "image/png");
+
+        assert!(matches!(msg.role, Role::User));
+        assert!(msg.has_images());
+    }
+
+    #[test]
+    fn test_content_has_images() {
+        let text_content = Content::text("Just text");
+        assert!(!text_content.has_images());
+
+        let multi_content = Content::multi(vec![
+            ContentPart::text("Text"),
+            ContentPart::image_url("https://example.com/img.jpg", "image/jpeg"),
+        ]);
+        assert!(multi_content.has_images());
+    }
+
+    #[test]
+    fn test_content_get_images() {
+        let content = Content::multi(vec![
+            ContentPart::text("Text"),
+            ContentPart::image_url("https://example.com/img1.jpg", "image/jpeg"),
+            ContentPart::image_url("https://example.com/img2.png", "image/png"),
+        ]);
+
+        let images = content.get_images();
+        assert_eq!(images.len(), 2);
+    }
+
+    #[test]
+    fn test_content_get_text_parts() {
+        let content = Content::multi(vec![
+            ContentPart::text("First text"),
+            ContentPart::image_url("https://example.com/img.jpg", "image/jpeg"),
+            ContentPart::text("Second text"),
+        ]);
+
+        let texts = content.get_text_parts();
+        assert_eq!(texts.len(), 2);
+        assert_eq!(texts[0], "First text");
+        assert_eq!(texts[1], "Second text");
+    }
+
+    #[test]
+    fn test_content_encode_image_base64() {
+        let data = vec![0x89, 0x50, 0x4E, 0x47];
+        let data_url = Content::encode_image_base64(&data, "image/png");
+
+        assert!(data_url.starts_with("data:image/png;base64,"));
+        assert!(data_url.contains("iVBORw"));
+    }
+
+    #[test]
+    fn test_content_decode_image_data_url() {
+        let data = vec![0x89, 0x50, 0x4E, 0x47];
+        let data_url = Content::encode_image_base64(&data, "image/png");
+
+        let (decoded, media_type) = Content::decode_image_data_url(&data_url).unwrap();
+        assert_eq!(decoded, data);
+        assert_eq!(media_type, "image/png");
+    }
+
+    #[test]
+    fn test_content_decode_invalid_data_url() {
+        assert!(Content::decode_image_data_url("not a data url").is_err());
+        assert!(Content::decode_image_data_url("data:text/plain").is_err());
+        assert!(Content::decode_image_data_url("data:image/png;base64,invalid!@#").is_err());
+    }
+
+    #[test]
+    fn test_message_multi_part_with_images() {
+        let parts = vec![
+            ContentPart::Text("Describe these images:".to_string()),
+            ContentPart::Image {
+                url: "https://example.com/img1.jpg".to_string(),
+                media_type: "image/jpeg".to_string(),
+                detail: Some("high".to_string()),
+            },
+            ContentPart::Image {
+                url: "https://example.com/img2.jpg".to_string(),
+                media_type: "image/jpeg".to_string(),
+                detail: Some("high".to_string()),
+            },
+        ];
+
+        let msg = Message::user_multi(parts);
+
+        assert!(matches!(msg.role, Role::User));
+        assert_eq!(msg.get_images().len(), 2);
+        assert!(msg.has_images());
+    }
+
+    #[test]
+    fn test_message_text_only_has_no_images() {
+        let msg = Message::user("Just text, no images");
+        assert!(!msg.has_images());
+        assert_eq!(msg.get_images().len(), 0);
+    }
+
+    #[test]
+    fn test_content_part_is_image() {
+        assert!(!ContentPart::Text("text".to_string()).is_image());
+        assert!(ContentPart::image_url("http://example.com/img.jpg", "image/jpeg").is_image());
+        assert!(ContentPart::image_bytes(vec![1, 2, 3], "image/png").is_image());
     }
 }
