@@ -1,0 +1,17 @@
+[package]
+name = "ai-provider-deepseek"
+version = "0.1.0"
+edition = "2021"
+description = "DeepSeek provider for the AI framework"
+license = "Apache-2.0"
+
+[dependencies]
+ai-core = { path = "../ai-core" }
+
+async-trait = { workspace = true }
+futures = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+async-stream = "0.3"

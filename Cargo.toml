@@ -2,6 +2,7 @@
 members = [
     "crates/ai-core",
     "crates/ai-provider-openai",
+    "crates/ai-provider-deepseek",
     "crates/ai-provider-anthropic",
     "crates/ai-provider-ollama",
     "crates/ai-provider-google",
