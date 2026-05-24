@@ -149,13 +149,18 @@ impl WebSearch {
     }
 
     /// Perform DuckDuckGo search.
-    async fn search_duckduckgo(&self, query: &str, num_results: usize) -> Result<Vec<SearchResult>, ToolError> {
+    async fn search_duckduckgo(
+        &self,
+        query: &str,
+        num_results: usize,
+    ) -> Result<Vec<SearchResult>, ToolError> {
         let url = format!(
             "https://html.duckduckgo.com/html/?q={}",
             urlencoding::encode(query)
         );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .header("User-Agent", "Mozilla/5.0")
             .send()
@@ -223,7 +228,8 @@ impl WebSearch {
             results.push(SearchResult {
                 title: format!("Search: {}", html.chars().take(100).collect::<String>()),
                 url: "https://duckduckgo.com".to_string(),
-                snippet: "HTML parsing unavailable. Please try a different search method.".to_string(),
+                snippet: "HTML parsing unavailable. Please try a different search method."
+                    .to_string(),
             });
         }
 
@@ -305,12 +311,10 @@ impl Tool for WebSearch {
         debug!("Searching for: {} (results: {})", input.query, num_results);
 
         let results = match self.config.provider {
-            SearchProvider::DuckDuckGo => {
-                self.search_duckduckgo(&input.query, num_results).await?
-            }
+            SearchProvider::DuckDuckGo => self.search_duckduckgo(&input.query, num_results).await?,
             SearchProvider::Custom => {
                 return Ok(ToolOutput::error(
-                    "Custom search provider not configured. Please set an endpoint and API key."
+                    "Custom search provider not configured. Please set an endpoint and API key.",
                 ));
             }
         };
@@ -345,7 +349,9 @@ mod tests {
             }
             Err(ToolError::Execution(e)) => {
                 // Network errors are acceptable in test environments
-                assert!(e.contains("Search request failed") || e.contains("Failed to read response"));
+                assert!(
+                    e.contains("Search request failed") || e.contains("Failed to read response")
+                );
             }
             Err(e) => {
                 panic!("Unexpected error: {:?}", e);
@@ -356,10 +362,7 @@ mod tests {
     #[tokio::test]
     async fn test_web_search_empty_query() {
         let tool = WebSearch::new();
-        let result = tool
-            .execute(json!({"query": ""}))
-            .await
-            .unwrap();
+        let result = tool.execute(json!({"query": ""})).await.unwrap();
 
         assert!(result.is_error);
         assert!(result.content.contains("empty"));
@@ -367,9 +370,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_web_search_num_results() {
-        let tool = WebSearch::with_config(
-            SearchConfig::default().with_max_results(5)
-        );
+        let tool = WebSearch::with_config(SearchConfig::default().with_max_results(5));
 
         let result = tool
             .execute(json!({"query": "test", "num_results": 3}))

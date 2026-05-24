@@ -170,11 +170,7 @@ mod tests {
 
     #[test]
     fn test_plan_step_creation() {
-        let step = PlanStep::new(
-            "step1",
-            "First step",
-            vec![],
-        );
+        let step = PlanStep::new("step1", "First step", vec![]);
 
         assert_eq!(step.id, "step1");
         assert_eq!(step.description, "First step");
@@ -185,11 +181,7 @@ mod tests {
 
     #[test]
     fn test_plan_step_with_dependencies() {
-        let step = PlanStep::new(
-            "step2",
-            "Second step",
-            vec!["step1".to_string()],
-        );
+        let step = PlanStep::new("step2", "Second step", vec!["step1".to_string()]);
 
         assert_eq!(step.dependencies.len(), 1);
         assert_eq!(step.dependencies[0], "step1");
@@ -221,8 +213,8 @@ mod tests {
 
     #[test]
     fn test_plan_add_step() {
-        let plan = Plan::new("plan1", "Test plan")
-            .add_step(PlanStep::new("step1", "First step", vec![]));
+        let plan =
+            Plan::new("plan1", "Test plan").add_step(PlanStep::new("step1", "First step", vec![]));
 
         assert_eq!(plan.steps.len(), 1);
         assert_eq!(plan.steps[0].id, "step1");
@@ -267,7 +259,11 @@ mod tests {
         let plan = Plan::new("plan1", "Test plan")
             .add_step(PlanStep::new("a", "Task A", vec![]))
             .add_step(PlanStep::new("b", "Task B", vec![]))
-            .add_step(PlanStep::new("c", "Task C", vec!["a".to_string(), "b".to_string()]))
+            .add_step(PlanStep::new(
+                "c",
+                "Task C",
+                vec!["a".to_string(), "b".to_string()],
+            ))
             .add_step(PlanStep::new("d", "Task D", vec!["c".to_string()]));
 
         let order = plan.execution_order();

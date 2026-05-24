@@ -15,10 +15,7 @@ pub enum DagError {
 
     /// A task depends on a non-existent task.
     #[error("Task '{task}' depends on unknown task '{dependency}'")]
-    UnknownDependency {
-        task: String,
-        dependency: String,
-    },
+    UnknownDependency { task: String, dependency: String },
 }
 
 /// A node in the dependency graph.
@@ -147,7 +144,10 @@ impl<T> Dag<T> {
         // Sort levels by original topological order
         for level in &mut levels {
             level.sort_by_key(|name| {
-                order.iter().position(|(n, _)| n == name).unwrap_or(usize::MAX)
+                order
+                    .iter()
+                    .position(|(n, _)| n == name)
+                    .unwrap_or(usize::MAX)
             });
         }
 
@@ -494,7 +494,10 @@ impl Dag<Task> {
 
         for step in steps {
             if let StepKind::Task(ref task) = &step.kind {
-                dag.add_node(&step.name, DagNode::new(task.clone(), task.dependencies.clone()));
+                dag.add_node(
+                    &step.name,
+                    DagNode::new(task.clone(), task.dependencies.clone()),
+                );
             }
         }
 
@@ -552,10 +555,7 @@ mod tests {
         dag.add_node("a", DagNode::new(1, vec!["b".to_string()]));
         dag.add_node("b", DagNode::new(2, vec!["a".to_string()]));
 
-        assert!(matches!(
-            dag.detect_cycles(),
-            Err(DagError::Cycle(_))
-        ));
+        assert!(matches!(dag.detect_cycles(), Err(DagError::Cycle(_))));
     }
 
     #[test]

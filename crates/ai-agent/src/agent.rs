@@ -197,11 +197,7 @@ where
 
         for iteration in 0..self.inner.max_iterations {
             let agent_name = self.name().unwrap_or("unnamed");
-            let turn_span = tracing::info_span!(
-                "agent_turn",
-                agent = agent_name,
-                iteration,
-            );
+            let turn_span = tracing::info_span!("agent_turn", agent = agent_name, iteration,);
 
             let response = async {
                 tracing::debug!(agent = agent_name, iteration, "Agent ReAct loop");

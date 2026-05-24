@@ -1075,9 +1075,7 @@ invalid_toml_syntax = [
         std::fs::write(&temp_path, "definitely not valid toml {{{{").unwrap();
 
         // This should not panic
-        let result = std::panic::catch_unwind(|| {
-            FrameworkConfig::load_from_path(&temp_path)
-        });
+        let result = std::panic::catch_unwind(|| FrameworkConfig::load_from_path(&temp_path));
 
         assert!(result.is_ok());
         let config_result = result.unwrap();

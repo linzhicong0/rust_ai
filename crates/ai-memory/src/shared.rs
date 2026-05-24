@@ -74,7 +74,10 @@ impl<M> Memory for SharedMemory<M>
 where
     M: Memory + Send + Sync,
 {
-    async fn add(&self, entry: ai_core::memory::MemoryEntry) -> Result<(), ai_core::error::MemoryError> {
+    async fn add(
+        &self,
+        entry: ai_core::memory::MemoryEntry,
+    ) -> Result<(), ai_core::error::MemoryError> {
         self.0.add(entry).await
     }
 
@@ -101,9 +104,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ai_core::{Memory, MemoryEntry};
     use crate::InMemoryMemory;
     use ai_core::types::Role;
+    use ai_core::{Memory, MemoryEntry};
 
     #[tokio::test]
     async fn test_shared_cloning() {

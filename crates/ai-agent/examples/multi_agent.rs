@@ -2,7 +2,9 @@ use ai_agent::{AgentBuilder, DelegateTool, DelegationWorker};
 use ai_core::error::ProviderError;
 use ai_core::provider::Provider;
 use ai_core::tool::ToolDescriptor;
-use ai_core::types::{CompletionResponse, FinishReason, Message, ModelConfig, StreamChunk, ToolCall, Usage};
+use ai_core::types::{
+    CompletionResponse, FinishReason, Message, ModelConfig, StreamChunk, ToolCall, Usage,
+};
 use ai_memory::AgentMemory;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -72,10 +74,13 @@ impl Provider for ManagerProvider {
         _config: &ModelConfig,
         _tools: &[ToolDescriptor],
     ) -> Result<CompletionResponse, ProviderError> {
-        let delegated_result = messages.iter().rev().find_map(|message| match message.role {
-            ai_core::types::Role::Tool => message.content.as_text().map(str::to_string),
-            _ => None,
-        });
+        let delegated_result = messages
+            .iter()
+            .rev()
+            .find_map(|message| match message.role {
+                ai_core::types::Role::Tool => message.content.as_text().map(str::to_string),
+                _ => None,
+            });
 
         if let Some(result) = delegated_result {
             return Ok(CompletionResponse {

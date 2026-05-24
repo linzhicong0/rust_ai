@@ -39,10 +39,14 @@
 
 pub mod agent;
 pub mod in_memory;
+pub mod long_term;
 pub mod scoped;
 pub mod shared;
 
 pub use agent::AgentMemory;
 pub use in_memory::InMemoryMemory;
+pub use long_term::{
+    InMemoryLongTermStore, LongTermMemory, LongTermMemoryConfig, LongTermMemoryEntry,
+};
 pub use scoped::ThreadScopedMemory;
 pub use shared::SharedMemory;

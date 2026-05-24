@@ -72,7 +72,11 @@ impl Parse for ToolArgs {
             }
         }
 
-        Ok(ToolArgs { name, description, input_schema })
+        Ok(ToolArgs {
+            name,
+            description,
+            input_schema,
+        })
     }
 }
 

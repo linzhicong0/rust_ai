@@ -144,9 +144,9 @@ impl ai_core::memory::ScopedMemory for ThreadScopedMemory {
                 .iter()
                 .filter(|e| {
                     e.content.to_lowercase().contains(&query_lower)
-                        || e.metadata.values().any(|v| {
-                            v.to_string().to_lowercase().contains(&query_lower)
-                        })
+                        || e.metadata
+                            .values()
+                            .any(|v| v.to_string().to_lowercase().contains(&query_lower))
                 })
                 .take(limit)
                 .cloned()
@@ -176,8 +176,8 @@ impl ai_core::memory::ScopedMemory for ThreadScopedMemory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ai_core::types::Role;
     use ai_core::memory::ScopedMemory;
+    use ai_core::types::Role;
 
     #[tokio::test]
     async fn test_multiple_scopes() {

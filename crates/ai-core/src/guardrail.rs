@@ -241,10 +241,7 @@ impl PromptInjectionGuard {
         // a non-alphanumeric char or the start of the string) to avoid
         // matching partial words and generating false positives.
         let min_len = self.leak_detection_min_len;
-        let char_boundaries: Vec<usize> = system_lower
-            .char_indices()
-            .map(|(i, _)| i)
-            .collect();
+        let char_boundaries: Vec<usize> = system_lower.char_indices().map(|(i, _)| i).collect();
 
         for start_char_idx in 0..=(total.saturating_sub(min_len)) {
             // Require that the phrase begins at a word boundary.
@@ -530,9 +527,17 @@ impl RegexPiiDetector {
     /// Creates a new PII detector with default patterns.
     pub fn default() -> Self {
         Self::new()
-            .add_pattern(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "email", PiiAction::Redact)
+            .add_pattern(
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+                "email",
+                PiiAction::Redact,
+            )
             .add_pattern(r"\b\d{3}-\d{2}-\d{4}\b", "ssn", PiiAction::Block)
-            .add_pattern(r"\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b", "credit_card", PiiAction::Block)
+            .add_pattern(
+                r"\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b",
+                "credit_card",
+                PiiAction::Block,
+            )
             .add_pattern(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b", "phone", PiiAction::Redact)
     }
 
@@ -579,7 +584,9 @@ impl RegexPiiDetector {
     fn redact_pii(&self, text: &str) -> String {
         let mut result = text.to_string();
         for (regex, _, name) in &self.patterns {
-            result = regex.replace_all(&result, format!("[{}_REDACTED]", name.to_uppercase())).to_string();
+            result = regex
+                .replace_all(&result, format!("[{}_REDACTED]", name.to_uppercase()))
+                .to_string();
         }
         result
     }
@@ -686,7 +693,8 @@ impl LengthLimiter {
         if let Some(min) = self.min_length {
             if length < min {
                 return Err(GuardrailError::Check(format!(
-                    "Input too short: {} characters (minimum: {})", length, min
+                    "Input too short: {} characters (minimum: {})",
+                    length, min
                 )));
             }
         }
@@ -694,7 +702,8 @@ impl LengthLimiter {
         if let Some(max) = self.max_length {
             if length > max {
                 return Err(GuardrailError::Check(format!(
-                    "Input too long: {} characters (maximum: {})", length, max
+                    "Input too long: {} characters (maximum: {})",
+                    length, max
                 )));
             }
         }
@@ -753,8 +762,12 @@ impl Guardrail for LengthLimiter {
 /// ```
 pub struct CustomGuardrail<F1, F2>
 where
-    F1: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>> + Send + Sync,
-    F2: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>> + Send + Sync,
+    F1: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>>
+        + Send
+        + Sync,
+    F2: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>>
+        + Send
+        + Sync,
 {
     name: String,
     check_input_fn: F1,
@@ -763,8 +776,12 @@ where
 
 impl<F1, F2> CustomGuardrail<F1, F2>
 where
-    F1: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>> + Send + Sync,
-    F2: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>> + Send + Sync,
+    F1: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>>
+        + Send
+        + Sync,
+    F2: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>>
+        + Send
+        + Sync,
 {
     /// Creates a new custom guardrail.
     ///
@@ -773,11 +790,7 @@ where
     /// * `name` — Name of the guardrail
     /// * `check_input_fn` — Function to validate inputs
     /// * `check_output_fn` — Function to validate outputs
-    pub fn new(
-        name: impl Into<String>,
-        check_input_fn: F1,
-        check_output_fn: F2,
-    ) -> Self {
+    pub fn new(name: impl Into<String>, check_input_fn: F1, check_output_fn: F2) -> Self {
         Self {
             name: name.into(),
             check_input_fn,
@@ -788,7 +801,10 @@ where
     /// Creates a custom guardrail that uses the same validation for input and output.
     pub fn symmetric<F>(name: impl Into<String>, check_fn: F) -> CustomGuardrail<F, F>
     where
-        F: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>> + Send + Sync + Clone,
+        F: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>>
+            + Send
+            + Sync
+            + Clone,
     {
         CustomGuardrail {
             name: name.into(),
@@ -801,8 +817,12 @@ where
 #[async_trait]
 impl<F1, F2> Guardrail for CustomGuardrail<F1, F2>
 where
-    F1: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>> + Send + Sync,
-    F2: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>> + Send + Sync,
+    F1: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>>
+        + Send
+        + Sync,
+    F2: Fn(&str) -> futures::future::BoxFuture<'static, Result<GuardrailAction, GuardrailError>>
+        + Send
+        + Sync,
 {
     async fn check_input(&self, input: &str) -> Result<GuardrailAction, GuardrailError> {
         (self.check_input_fn)(input).await
@@ -840,9 +860,7 @@ mod tests {
         async fn check_output(&self, output: &str) -> Result<GuardrailAction, GuardrailError> {
             for word in &self.block_words {
                 if output.contains(word) {
-                    return Ok(GuardrailAction::Modify(
-                        output.replace(word, "[REDACTED]")
-                    ));
+                    return Ok(GuardrailAction::Modify(output.replace(word, "[REDACTED]")));
                 }
             }
             Ok(GuardrailAction::Allow)
@@ -869,7 +887,10 @@ mod tests {
             block_words: vec!["secret".to_string()],
         };
 
-        let result = guardrail.check_input("This is a secret message").await.unwrap();
+        let result = guardrail
+            .check_input("This is a secret message")
+            .await
+            .unwrap();
         match result {
             GuardrailAction::Block(reason) => {
                 assert!(reason.contains("secret"));
@@ -909,7 +930,10 @@ mod tests {
     #[test]
     fn test_guardrail_action_equality() {
         assert_eq!(GuardrailAction::Allow, GuardrailAction::Allow);
-        assert_ne!(GuardrailAction::Allow, GuardrailAction::Block("reason".to_string()));
+        assert_ne!(
+            GuardrailAction::Allow,
+            GuardrailAction::Block("reason".to_string())
+        );
 
         let block1 = GuardrailAction::Block("test".to_string());
         let block2 = GuardrailAction::Block("test".to_string());
@@ -1123,7 +1147,9 @@ mod tests {
     #[tokio::test]
     async fn test_guardrail_chain_allows() {
         let chain = GuardrailChain::new()
-            .add(MockGuardrail { block_words: vec!["secret".to_string()] })
+            .add(MockGuardrail {
+                block_words: vec!["secret".to_string()],
+            })
             .add(LengthLimiter::max(1000));
 
         let result = chain.check_input("Hello, world!").await.unwrap();
@@ -1133,7 +1159,9 @@ mod tests {
     #[tokio::test]
     async fn test_guardrail_chain_blocks() {
         let chain = GuardrailChain::new()
-            .add(MockGuardrail { block_words: vec!["secret".to_string()] })
+            .add(MockGuardrail {
+                block_words: vec!["secret".to_string()],
+            })
             .add(LengthLimiter::max(1000));
 
         let result = chain.check_input("This is a secret message").await.unwrap();
@@ -1147,9 +1175,13 @@ mod tests {
     async fn test_guardrail_chain_stops_at_first_violation() {
         let chain = GuardrailChain::new()
             .add(LengthLimiter::max(10))
-            .add(MockGuardrail { block_words: vec!["secret".to_string()] });
+            .add(MockGuardrail {
+                block_words: vec!["secret".to_string()],
+            });
 
-        let result = chain.check_input("This is a very long message that exceeds the limit").await;
+        let result = chain
+            .check_input("This is a very long message that exceeds the limit")
+            .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("too long"));
     }
@@ -1185,7 +1217,10 @@ mod tests {
     async fn test_pii_detector_email() {
         let detector = RegexPiiDetector::default();
 
-        let result = detector.check_input("My email is test@example.com").await.unwrap();
+        let result = detector
+            .check_input("My email is test@example.com")
+            .await
+            .unwrap();
         match result {
             GuardrailAction::Modify(redacted) => {
                 assert!(redacted.contains("[EMAIL_REDACTED]"));
@@ -1218,10 +1253,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_pii_detector_custom_pattern() {
-        let detector = RegexPiiDetector::new()
-            .add_pattern(r"\bAPI_KEY_\w+\b", "api_key", PiiAction::Block);
+        let detector =
+            RegexPiiDetector::new().add_pattern(r"\bAPI_KEY_\w+\b", "api_key", PiiAction::Block);
 
-        let result = detector.check_input("Use API_KEY_abc123 for access").await.unwrap();
+        let result = detector
+            .check_input("Use API_KEY_abc123 for access")
+            .await
+            .unwrap();
         match result {
             GuardrailAction::Block(reason) => {
                 assert!(reason.contains("api_key"));
@@ -1262,7 +1300,10 @@ mod tests {
             .add(RegexPiiDetector::default());
 
         // Should pass length check but trigger PII detector
-        let result = chain.check_input("My email is test@example.com and this message is short").await.unwrap();
+        let result = chain
+            .check_input("My email is test@example.com and this message is short")
+            .await
+            .unwrap();
         match result {
             GuardrailAction::Modify(_) => {}
             _ => panic!("Expected Modify action from PII detector"),

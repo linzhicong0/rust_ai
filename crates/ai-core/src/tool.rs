@@ -332,10 +332,7 @@ impl ToolRegistry {
 
     /// Get all tool descriptors.
     pub fn descriptors(&self) -> Vec<ToolDescriptor> {
-        self.tools
-            .values()
-            .map(|t| t.descriptor())
-            .collect()
+        self.tools.values().map(|t| t.descriptor()).collect()
     }
 
     /// Check if a tool is registered.
@@ -357,11 +354,7 @@ mod tests {
     #[async_trait::async_trait]
     impl Tool for TestTool {
         fn descriptor(&self) -> ToolDescriptor {
-            ToolDescriptor::new(
-                "test",
-                "A test tool",
-                json!({"type": "object"}),
-            )
+            ToolDescriptor::new("test", "A test tool", json!({"type": "object"}))
         }
 
         async fn execute(&self, input: Value) -> Result<ToolOutput, ToolError> {
@@ -389,10 +382,7 @@ mod tests {
     #[tokio::test]
     async fn test_tool_execution() {
         let tool = TestTool;
-        let result = tool
-            .execute(json!({"key": "value"}))
-            .await
-            .unwrap();
+        let result = tool.execute(json!({"key": "value"})).await.unwrap();
         assert!(!result.is_error);
         assert!(result.content.contains("Received"));
     }
@@ -419,11 +409,7 @@ mod tests {
 
     #[test]
     fn test_tool_descriptor_new() {
-        let descriptor = ToolDescriptor::new(
-            "my_tool",
-            "A description",
-            json!({"type": "object"}),
-        );
+        let descriptor = ToolDescriptor::new("my_tool", "A description", json!({"type": "object"}));
 
         assert_eq!(descriptor.name, "my_tool");
         assert_eq!(descriptor.description, "A description");
@@ -433,17 +419,10 @@ mod tests {
 
     #[test]
     fn test_tool_descriptor_with_output_schema() {
-        let descriptor = ToolDescriptor::new(
-            "my_tool",
-            "A description",
-            json!({"type": "object"}),
-        )
-        .with_output_schema(json!({"type": "string"}));
+        let descriptor = ToolDescriptor::new("my_tool", "A description", json!({"type": "object"}))
+            .with_output_schema(json!({"type": "string"}));
 
-        assert_eq!(
-            descriptor.output_schema,
-            Some(json!({"type": "string"}))
-        );
+        assert_eq!(descriptor.output_schema, Some(json!({"type": "string"})));
     }
 
     #[test]
@@ -537,9 +516,7 @@ mod tests {
             "echo",
             "Echoes the input",
             json!({"type": "object"}),
-            |input| async move {
-                Ok(ToolOutput::success(format!("Echo: {}", input)))
-            }.boxed(),
+            |input| async move { Ok(ToolOutput::success(format!("Echo: {}", input))) }.boxed(),
         );
 
         let descriptor = tool.descriptor();
@@ -556,9 +533,7 @@ mod tests {
             "fail_tool",
             "A tool that fails",
             json!({"type": "object"}),
-            |_input| async move {
-                Ok(ToolOutput::error("Something went wrong"))
-            }.boxed(),
+            |_input| async move { Ok(ToolOutput::error("Something went wrong")) }.boxed(),
         );
 
         let result = tool.execute(json!({})).await.unwrap();
@@ -572,17 +547,12 @@ mod tests {
             "json_tool",
             "Returns JSON",
             json!({"type": "object"}),
-            |_input| async move {
-                Ok(ToolOutput::success("{\"result\": 42}".to_string()))
-            }.boxed(),
+            |_input| async move { Ok(ToolOutput::success("{\"result\": 42}".to_string())) }.boxed(),
         )
         .with_output_schema(json!({"type": "string"}));
 
         let descriptor = tool.descriptor();
-        assert_eq!(
-            descriptor.output_schema,
-            Some(json!({"type": "string"}))
-        );
+        assert_eq!(descriptor.output_schema, Some(json!({"type": "string"})));
     }
 
     // Test SyncTool and SyncToolAdapter
@@ -590,11 +560,7 @@ mod tests {
 
     impl SyncTool for SyncTestTool {
         fn descriptor(&self) -> ToolDescriptor {
-            ToolDescriptor::new(
-                "sync_test",
-                "A sync test tool",
-                json!({"type": "object"}),
-            )
+            ToolDescriptor::new("sync_test", "A sync test tool", json!({"type": "object"}))
         }
 
         fn execute_sync(&self, input: Value) -> Result<ToolOutput, ToolError> {
@@ -649,7 +615,10 @@ mod tests {
 
         assert_eq!(descriptor.name, "my_tool");
         assert_eq!(descriptor.description, "Does something");
-        assert_eq!(descriptor.input_schema, json!({"type": "object", "properties": {}}));
+        assert_eq!(
+            descriptor.input_schema,
+            json!({"type": "object", "properties": {}})
+        );
     }
 
     // Test ToolOutput edge cases

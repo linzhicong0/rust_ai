@@ -36,8 +36,8 @@ use ai_core::error::ProviderError;
 use ai_core::provider::Provider;
 use ai_core::tool::ToolDescriptor;
 use ai_core::types::{
-    CompletionResponse, Content, ContentPart, FinishReason, Message,
-    ModelConfig, Role, StreamChunk, ToolCall, Usage,
+    CompletionResponse, Content, ContentPart, FinishReason, Message, ModelConfig, Role,
+    StreamChunk, ToolCall, Usage,
 };
 
 /// OpenAI API provider.
@@ -131,15 +131,21 @@ impl OpenAiProvider {
                     .into_iter()
                     .map(|p| match p {
                         ContentPart::Text(t) => OpenAiContentPart::Text { text: t },
-                        ContentPart::Image { url, media_type, detail } => {
-                            OpenAiContentPart::ImageUrl {
-                                image_url: OpenAiImageUrl {
-                                    url,
-                                    detail: detail.or(Some("auto".to_string())),
-                                },
-                            }
-                        }
-                        ContentPart::ImageBytes { data, media_type, detail } => {
+                        ContentPart::Image {
+                            url,
+                            media_type,
+                            detail,
+                        } => OpenAiContentPart::ImageUrl {
+                            image_url: OpenAiImageUrl {
+                                url,
+                                detail: detail.or(Some("auto".to_string())),
+                            },
+                        },
+                        ContentPart::ImageBytes {
+                            data,
+                            media_type,
+                            detail,
+                        } => {
                             // Convert bytes to base64 data URL
                             use base64::prelude::*;
                             let base64 = BASE64_STANDARD.encode(&data);
@@ -228,7 +234,11 @@ impl Provider for OpenAiProvider {
             serde_json::from_str(&body).map_err(ProviderError::Deserialize)?;
 
         Ok(CompletionResponse {
-            content: openai_response.choices[0].message.content.clone().unwrap_or_default(),
+            content: openai_response.choices[0]
+                .message
+                .content
+                .clone()
+                .unwrap_or_default(),
             tool_calls: openai_response.choices[0]
                 .message
                 .tool_calls
@@ -598,8 +608,7 @@ mod tests {
 
     #[test]
     fn test_provider_with_json_mode() {
-        let provider = OpenAiProvider::new("test-key".to_string())
-            .with_json_mode(true);
+        let provider = OpenAiProvider::new("test-key".to_string()).with_json_mode(true);
         assert!(provider.json_mode);
     }
 
@@ -754,7 +763,10 @@ mod tests {
         assert!(chunk.is_ok());
 
         let chunk = chunk.unwrap();
-        assert_eq!(chunk.choices[0].finish_reason, Some("tool_calls".to_string()));
+        assert_eq!(
+            chunk.choices[0].finish_reason,
+            Some("tool_calls".to_string())
+        );
     }
 
     #[test]
@@ -784,7 +796,10 @@ mod tests {
 
         let response = response.unwrap();
         assert_eq!(response.choices.len(), 1);
-        assert_eq!(response.choices[0].message.content, Some("Hello!".to_string()));
+        assert_eq!(
+            response.choices[0].message.content,
+            Some("Hello!".to_string())
+        );
         assert_eq!(response.choices[0].finish_reason, "stop");
         assert_eq!(response.usage.prompt_tokens, 10);
         assert_eq!(response.usage.completion_tokens, 5);
@@ -874,12 +889,10 @@ mod tests {
 
     #[test]
     fn test_openai_content_with_base64_image() {
-        let parts = vec![
-            ContentPart::Image {
-                url: "data:image/jpeg;base64,/9j/4AAQSkZJRg".to_string(),
-                media_type: "image/jpeg".to_string(),
-            },
-        ];
+        let parts = vec![ContentPart::Image {
+            url: "data:image/jpeg;base64,/9j/4AAQSkZJRg".to_string(),
+            media_type: "image/jpeg".to_string(),
+        }];
 
         let content = Content::MultiPart(parts);
         let openai_content = OpenAiProvider::convert_content(content);
@@ -988,7 +1001,8 @@ mod tests {
     #[test]
     fn test_sse_empty_delta_handling() {
         // Test handling of chunks with empty deltas (first chunk often has no content)
-        let json = r#"{"id":"1","choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":null}]}"#;
+        let json =
+            r#"{"id":"1","choices":[{"index":0,"delta":{},"logprobs":null,"finish_reason":null}]}"#;
 
         let chunk = serde_json::from_str::<OpenAiStreamChunk>(json);
         assert!(chunk.is_ok());
@@ -1012,17 +1026,23 @@ mod tests {
 
         let chunk = chunk.unwrap();
         assert_eq!(chunk.choices.len(), 2);
-        assert_eq!(chunk.choices[0].delta.content.as_deref(), Some("Response A"));
-        assert_eq!(chunk.choices[1].delta.content.as_deref(), Some("Response B"));
+        assert_eq!(
+            chunk.choices[0].delta.content.as_deref(),
+            Some("Response A")
+        );
+        assert_eq!(
+            chunk.choices[1].delta.content.as_deref(),
+            Some("Response B")
+        );
     }
 
     #[test]
     fn test_sse_parse_malformed_recoverable() {
         // Test that malformed SSE lines are handled gracefully
         let malformed_lines = vec![
-            "",  // Empty line
-            ":", // Comment-only line
-            "data: ", // Incomplete data
+            "",               // Empty line
+            ":",              // Comment-only line
+            "data: ",         // Incomplete data
             "event: message", // Event line without data
         ];
 

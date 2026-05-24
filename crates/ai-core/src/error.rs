@@ -145,6 +145,9 @@ mod tests {
         assert_eq!(err.to_string(), "Tool execution failed: something failed");
 
         let agent_err = AgentError::Tool(err);
-        assert_eq!(agent_err.to_string(), "Tool error: Tool execution failed: something failed");
+        assert_eq!(
+            agent_err.to_string(),
+            "Tool error: Tool execution failed: something failed"
+        );
     }
 }

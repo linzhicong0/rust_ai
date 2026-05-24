@@ -94,9 +94,9 @@ impl Memory for InMemoryMemory {
             .iter()
             .filter(|e| {
                 e.content.to_lowercase().contains(&query_lower)
-                    || e.metadata.values().any(|v| {
-                        v.to_string().to_lowercase().contains(&query_lower)
-                    })
+                    || e.metadata
+                        .values()
+                        .any(|v| v.to_string().to_lowercase().contains(&query_lower))
             })
             .take(limit)
             .cloned()

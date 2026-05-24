@@ -42,20 +42,45 @@ pub struct ShellConfig {
 impl Default for ShellConfig {
     fn default() -> Self {
         let mut blocked: HashSet<String> = [
-            "rm", "rmdir", "mv", "dd", "mkfs",
-            "sudo", "su", "doas",
-            "chmod", "chown",
-            "kill", "killall",
-            "reboot", "shutdown", "poweroff",
-            "passwd", "usermod", "userdel",
-            "curl", "wget", "nc", "netcat",
-            "iptables", "nftables",
-            "crontab", "at",
-            "systemctl", "service",
-        ].iter().map(|s| s.to_string()).collect();
+            "rm",
+            "rmdir",
+            "mv",
+            "dd",
+            "mkfs",
+            "sudo",
+            "su",
+            "doas",
+            "chmod",
+            "chown",
+            "kill",
+            "killall",
+            "reboot",
+            "shutdown",
+            "poweroff",
+            "passwd",
+            "usermod",
+            "userdel",
+            "curl",
+            "wget",
+            "nc",
+            "netcat",
+            "iptables",
+            "nftables",
+            "crontab",
+            "at",
+            "systemctl",
+            "service",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
 
         // Block shell built-ins that could be dangerous
-        blocked.extend(["sh", "bash", "zsh", "fish", "cmd", "powershell"].iter().map(|s| s.to_string()));
+        blocked.extend(
+            ["sh", "bash", "zsh", "fish", "cmd", "powershell"]
+                .iter()
+                .map(|s| s.to_string()),
+        );
 
         Self {
             allowed_commands: HashSet::new(),
@@ -63,7 +88,7 @@ impl Default for ShellConfig {
             working_dir: None,
             timeout_secs: 30,
             max_output_size: 1024 * 1024, // 1 MB
-            enabled: false, // MUST be explicitly enabled
+            enabled: false,               // MUST be explicitly enabled
         }
     }
 }
@@ -102,7 +127,8 @@ impl ShellConfig {
     /// Validate a command against allowlist and blocklist.
     fn validate_command(&self, cmd: &str) -> Result<(), ToolError> {
         // Extract the base command (first word)
-        let base_cmd = cmd.split_whitespace()
+        let base_cmd = cmd
+            .split_whitespace()
             .next()
             .ok_or_else(|| ToolError::InvalidInput("Empty command".to_string()))?;
 
@@ -127,7 +153,7 @@ impl ShellConfig {
         // Check for shell metacharacters that could enable command injection
         if cmd.contains('|') || cmd.contains(';') || cmd.contains('&') || cmd.contains('$') {
             return Err(ToolError::Execution(
-                "Shell metacharacters (|, ;, &, $) are not allowed".to_string()
+                "Shell metacharacters (|, ;, &, $) are not allowed".to_string(),
             ));
         }
 
@@ -190,8 +216,9 @@ impl ShellExec {
     async fn execute_command(&self, command: &str, args: &[String]) -> Result<String, ToolError> {
         if !self.config.enabled {
             return Ok(ToolOutput::error(
-                "Shell execution is disabled. Enable it explicitly with ShellConfig::enabled(true)"
-            ).content);
+                "Shell execution is disabled. Enable it explicitly with ShellConfig::enabled(true)",
+            )
+            .content);
         }
 
         self.config.validate_command(command)?;
@@ -214,16 +241,15 @@ impl ShellExec {
         let timeout = Duration::from_secs(self.config.timeout_secs);
 
         // Execute with timeout
-        let output = tokio::time::timeout(
-            timeout,
-            cmd.output()
-        )
-        .await
-        .map_err(|_| ToolError::Execution(format!(
-            "Command timed out after {} seconds",
-            self.config.timeout_secs
-        )))?
-        .map_err(|e| ToolError::Execution(format!("Failed to execute command: {}", e)))?;
+        let output = tokio::time::timeout(timeout, cmd.output())
+            .await
+            .map_err(|_| {
+                ToolError::Execution(format!(
+                    "Command timed out after {} seconds",
+                    self.config.timeout_secs
+                ))
+            })?
+            .map_err(|e| ToolError::Execution(format!("Failed to execute command: {}", e)))?;
 
         // Get output, respecting size limits
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -235,7 +261,8 @@ impl ShellExec {
                 "Output too large: {} bytes (max: {} bytes)",
                 stdout.len(),
                 self.config.max_output_size
-            )).content);
+            ))
+            .content);
         }
 
         // Format result
@@ -285,7 +312,7 @@ impl Tool for ShellExec {
     async fn execute(&self, input: Value) -> Result<ToolOutput, ToolError> {
         if !self.config.enabled {
             return Ok(ToolOutput::error(
-                "Shell execution is disabled. Enable it with ShellConfig::enabled(true)"
+                "Shell execution is disabled. Enable it with ShellConfig::enabled(true)",
             ));
         }
 
@@ -401,16 +428,15 @@ mod tests {
         let tool = ShellExec::with_config(config);
 
         let result = tool
-            .execute(json!({"command": "rm", "args": ["-rf", "/"]})).await;
+            .execute(json!({"command": "rm", "args": ["-rf", "/"]}))
+            .await;
 
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_shell_exec_allowed_command() {
-        let config = ShellConfig::default()
-            .enabled(true)
-            .allow_command("echo");
+        let config = ShellConfig::default().enabled(true).allow_command("echo");
         let tool = ShellExec::with_config(config);
 
         let result = tool
@@ -424,9 +450,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_shell_exec_command_not_in_allowlist() {
-        let config = ShellConfig::default()
-            .enabled(true)
-            .allow_command("echo");
+        let config = ShellConfig::default().enabled(true).allow_command("echo");
         let tool = ShellExec::with_config(config);
 
         let result = tool.execute(json!({"command": "ls"})).await;
@@ -437,14 +461,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_shell_exec_metacharacters_blocked() {
-        let config = ShellConfig::default()
-            .enabled(true)
-            .allow_command("echo");
+        let config = ShellConfig::default().enabled(true).allow_command("echo");
         let tool = ShellExec::with_config(config);
 
-        let result = tool
-            .execute(json!({"command": "echo|rm -rf /"}))
-            .await;
+        let result = tool.execute(json!({"command": "echo|rm -rf /"})).await;
 
         assert!(result.is_err());
     }
@@ -454,9 +474,7 @@ mod tests {
         let tool = SafeShell::new();
 
         // ls should be allowed
-        let result = tool
-            .execute(json!({"command": "pwd"}))
-            .await;
+        let result = tool.execute(json!({"command": "pwd"})).await;
 
         // May succeed or fail depending on test environment
         // Just verify it returns something
@@ -476,7 +494,8 @@ mod tests {
 
         // rm should be blocked even in safe shell
         let result = tool
-            .execute(json!({"command": "rm", "args": ["-rf", "/"]})).await;
+            .execute(json!({"command": "rm", "args": ["-rf", "/"]}))
+            .await;
 
         assert!(result.is_err());
     }
