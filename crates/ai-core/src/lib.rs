@@ -99,6 +99,9 @@ pub use crate::output_format::{format_output, OutputFormat, OutputFormatConfig};
 // Re-export rate limiting (REQ-12.4)
 pub use crate::rate_limit::{RateLimitConfig, RateLimitExceeded, TokenBucketRateLimiter};
 
+// Re-export system prompt builder (REQ-4.4)
+pub use crate::system_prompt::SystemPromptBuilder;
+
 // Module declarations
 pub mod client;
 pub mod config;
@@ -115,6 +118,7 @@ pub mod prompt_injection;
 pub mod provider;
 pub mod rate_limit;
 pub mod structured;
+pub mod system_prompt;
 pub mod template;
 pub mod tool;
 pub mod types;
