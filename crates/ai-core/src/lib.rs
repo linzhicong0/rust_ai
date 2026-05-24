@@ -69,6 +69,9 @@ pub use crate::plugin::{Plugin, PluginError, PluginRegistry, PluginRequest, Plug
 pub use crate::provider::Provider;
 pub use crate::tool::{Tool, ToolDescriptor, ToolOutput};
 
+// Re-export tool validation (REQ-3.4)
+pub use crate::tool::{coerce_input, validate_tool_input, ValidationError};
+
 // Re-export configuration
 pub use crate::config::FrameworkConfig;
 
@@ -86,9 +89,15 @@ pub use crate::template::TemplateEngine;
 
 // Re-export structured output
 pub use crate::structured::{
-    complete_structured, extract_json, StructuredOutputConfig, StructuredOutputError,
-    StructuredOutputValidator,
+    complete_structured, extract_and_fix_json, extract_json, fix_json, StructuredOutputConfig,
+    StructuredOutputError, StructuredOutputValidator,
 };
+
+// Re-export output formatting (REQ-9.4)
+pub use crate::output_format::{format_output, OutputFormat, OutputFormatConfig};
+
+// Re-export rate limiting (REQ-12.4)
+pub use crate::rate_limit::{RateLimitConfig, RateLimitExceeded, TokenBucketRateLimiter};
 
 // Module declarations
 pub mod client;
@@ -100,9 +109,11 @@ pub mod error;
 pub mod guardrail;
 pub mod memory;
 pub mod model_registry;
+pub mod output_format;
 pub mod plugin;
 pub mod prompt_injection;
 pub mod provider;
+pub mod rate_limit;
 pub mod structured;
 pub mod template;
 pub mod tool;

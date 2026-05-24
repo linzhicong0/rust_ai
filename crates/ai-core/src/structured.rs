@@ -188,6 +188,85 @@ pub fn extract_json(response: &str) -> Option<String> {
     None
 }
 
+/// Fix common JSON issues such as trailing commas and unquoted keys.
+///
+/// This function attempts to auto-fix malformed JSON that LLMs commonly produce:
+/// - Trailing commas in objects and arrays
+/// - Unquoted keys in objects
+///
+/// Returns `Some(fixed_json)` if a fix was applied successfully, or `None` if
+/// the input is too malformed to repair.
+pub fn fix_json(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+
+    // If already valid, return as-is
+    if serde_json::from_str::<Value>(trimmed).is_ok() {
+        return Some(trimmed.to_string());
+    }
+
+    let mut fixed = trimmed.to_string();
+
+    // Fix trailing commas: ,] or ,}
+    // Use a regex to remove commas before closing brackets/braces (ignoring whitespace)
+    let trailing_comma_re = regex::Regex::new(r",(\s*[}\]])").unwrap();
+    fixed = trailing_comma_re.replace_all(&fixed, "$1").to_string();
+
+    // Fix unquoted keys: {key: "value"} -> {"key": "value"}
+    // Match word characters followed by colon that are not inside quotes
+    let unquoted_key_re =
+        regex::Regex::new(r"(?m)([{\[,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:").unwrap();
+    fixed = unquoted_key_re
+        .replace_all(&fixed, r#"$1"$2":"#)
+        .to_string();
+
+    // Try to parse the fixed version
+    if serde_json::from_str::<Value>(&fixed).is_ok() {
+        Some(fixed)
+    } else {
+        None
+    }
+}
+
+/// Extract and fix JSON from a response, handling common LLM output issues.
+///
+/// This combines `extract_json` with `fix_json` to robustly extract JSON from
+/// LLM responses that may include markdown code blocks, prose, trailing commas,
+/// and unquoted keys.
+pub fn extract_and_fix_json(response: &str) -> Option<String> {
+    // First try standard extraction
+    if let Some(json) = extract_json(response) {
+        return Some(json);
+    }
+
+    // Try to extract from markdown code blocks and then fix
+    let trimmed = response.trim();
+
+    // Try extracting from ```json blocks
+    if let Some(start) = trimmed.find("```json") {
+        let start = start + 7;
+        if let Some(end) = trimmed[start..].find("```") {
+            let json_str = trimmed[start..start + end].trim();
+            if let Some(fixed) = fix_json(json_str) {
+                return Some(fixed);
+            }
+        }
+    }
+
+    // Try extracting from ``` blocks
+    if let Some(start) = trimmed.find("```") {
+        let start = start + 3;
+        if let Some(end) = trimmed[start..].find("```") {
+            let json_str = trimmed[start..start + end].trim();
+            if let Some(fixed) = fix_json(json_str) {
+                return Some(fixed);
+            }
+        }
+    }
+
+    // Try fixing the whole input
+    fix_json(trimmed)
+}
+
 /// Call a completion function and re-prompt on schema validation failure.
 ///
 /// This is the implementation of REQ-9.1's "Re-prompt on validation failure
@@ -716,5 +795,99 @@ Second: {"b": 2}"#;
                 assert!(e.to_string().contains("validation") || e.to_string().contains("Schema"))
             }
         }
+    }
+
+    // REQ-9.2: Output Parsing Tests
+
+    #[test]
+    fn test_extract_json_from_markdown_code_block() {
+        let response = "Here is the result:\n```json\n{\"key\": \"value\"}\n```";
+        let result = extract_json(response);
+        assert_eq!(result, Some("{\"key\": \"value\"}".to_string()));
+    }
+
+    #[test]
+    fn test_extract_json_wrapped_in_prose() {
+        let response = "The answer is {\"key\": \"value\"} as shown above.";
+        let result = extract_json(response);
+        assert_eq!(result, Some("{\"key\": \"value\"}".to_string()));
+    }
+
+    #[test]
+    fn test_fix_trailing_comma() {
+        let input = r#"{"a": 1,}"#;
+        let result = fix_json(input);
+        assert!(result.is_some());
+        let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert_eq!(parsed["a"], 1);
+    }
+
+    #[test]
+    fn test_fix_unquoted_key() {
+        let input = r#"{name: "test"}"#;
+        let result = fix_json(input);
+        assert!(result.is_some());
+        let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert_eq!(parsed["name"], "test");
+    }
+
+    #[tokio::test]
+    async fn test_malformed_response_triggers_retry_with_fix_feedback() {
+        let schema = json!({
+            "type": "object",
+            "properties": {"key": {"type": "string"}},
+            "required": ["key"]
+        });
+        let validator =
+            StructuredOutputValidator::new(StructuredOutputConfig::new(schema).with_max_retries(2))
+                .unwrap();
+
+        let call_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let call_count2 = call_count.clone();
+
+        let result = complete_structured(&validator, move |prompt| {
+            let n = call_count2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Box::pin(async move {
+                let response = if n == 0 {
+                    // First attempt: completely malformed
+                    "This is not JSON at all".to_string()
+                } else {
+                    // Second attempt: should include error feedback in prompt
+                    assert!(
+                        prompt.contains("invalid")
+                            || prompt.contains("Error")
+                            || prompt.contains("corrected"),
+                        "Retry prompt should contain error feedback"
+                    );
+                    r#"{"key": "fixed"}"#.to_string()
+                };
+                Ok::<String, Box<dyn std::error::Error + Send + Sync>>(response)
+            })
+        })
+        .await;
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap()["key"], "fixed");
+        // Should have been called at least twice (first fail + retry)
+        assert!(call_count.load(std::sync::atomic::Ordering::SeqCst) >= 2);
+    }
+
+    #[test]
+    fn test_fix_json_trailing_comma_in_array() {
+        let input = r#"{"items": [1, 2, 3,]}"#;
+        let result = fix_json(input);
+        assert!(result.is_some());
+        let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert_eq!(parsed["items"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_extract_and_fix_json_combined() {
+        // Test that extract_and_fix_json handles trailing commas in code blocks
+        let response = "```json\n{\"a\": 1,}\n```";
+        let result = extract_and_fix_json(response);
+        assert!(result.is_some());
+        let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();
+        assert_eq!(parsed["a"], 1);
     }
 }
