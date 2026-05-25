@@ -37,4 +37,4 @@
 
 ## Documentation Policy
 - Link to existing docs instead of copying them into code comments or new instruction files.
-- If implementation diverges from [README.md](README.md), [DESIGN.md](DESIGN.md), or [REQUIREMENTS.md](REQUIREMENTS.md), update the relevant document in the same change when practical.
+- If implementation diverges from [README.md](README.md), [DESIGN.html](DESIGN.html), or [REQUIREMENTS.html](REQUIREMENTS.html), update the relevant document in the same change when practical.
