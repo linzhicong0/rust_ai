@@ -91,6 +91,10 @@ pub enum AgentError {
     /// Agent tried to call a tool that wasn't registered.
     #[error("Tool not found: {0}")]
     ToolNotFound(String),
+
+    /// Error during plan execution.
+    #[error("Plan error: {0}")]
+    PlanError(String),
 }
 
 /// Errors from pipeline execution.
