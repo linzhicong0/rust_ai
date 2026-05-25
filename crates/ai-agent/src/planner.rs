@@ -162,6 +162,100 @@ pub struct PlanResult {
 
     /// Results from each step.
     pub step_results: Vec<(String, String)>,
+
+    /// Steps that failed and were re-planned.
+    pub replanned_steps: Vec<String>,
+}
+
+/// Executor that runs plans step by step with re-planning support.
+pub struct PlanExecutor {
+    /// Maximum number of re-plan attempts per step.
+    pub max_retries: u32,
+}
+
+impl PlanExecutor {
+    /// Create a new plan executor with a maximum retry count.
+    pub fn new(max_retries: u32) -> Self {
+        Self { max_retries }
+    }
+
+    /// Execute a plan using the provided step executor function.
+    ///
+    /// The `step_fn` receives a step description and returns a result string or error.
+    /// On failure, the executor will retry up to `max_retries` times.
+    pub async fn execute<F, Fut>(
+        &self,
+        plan: &mut Plan,
+        step_fn: F,
+    ) -> Result<PlanResult, AgentError>
+    where
+        F: Fn(String) -> Fut + Send + Sync,
+        Fut: std::future::Future<Output = Result<String, String>> + Send,
+    {
+        let order = plan
+            .execution_order()
+            .ok_or_else(|| AgentError::PlanError("Circular dependencies detected".to_string()))?;
+
+        let mut step_results = Vec::new();
+        let mut replanned_steps = Vec::new();
+
+        for step_template in &order {
+            let step = plan
+                .steps
+                .iter_mut()
+                .find(|s| s.id == step_template.id)
+                .unwrap();
+
+            step.status = PlanStepStatus::InProgress;
+
+            let mut attempts = 0;
+            let mut last_error = String::new();
+            let mut success = false;
+
+            while attempts <= self.max_retries {
+                match step_fn(step.description.clone()).await {
+                    Ok(result) => {
+                        step.status = PlanStepStatus::Completed;
+                        step.result = Some(result.clone());
+                        step_results.push((step.id.clone(), result));
+                        success = true;
+                        break;
+                    }
+                    Err(err) => {
+                        last_error = err;
+                        attempts += 1;
+                        if attempts <= self.max_retries {
+                            replanned_steps.push(step.id.clone());
+                        }
+                    }
+                }
+            }
+
+            if !success {
+                step.status = PlanStepStatus::Failed;
+                step.result = Some(last_error.clone());
+                step_results.push((step.id.clone(), format!("FAILED: {}", last_error)));
+
+                return Ok(PlanResult {
+                    success: false,
+                    step_results,
+                    replanned_steps,
+                });
+            }
+        }
+
+        Ok(PlanResult {
+            success: true,
+            step_results,
+            replanned_steps,
+        })
+    }
+}
+
+impl Default for PlanExecutor {
+    fn default() -> Self {
+        Self::new(2)
+    }
 }
 
 #[cfg(test)]
@@ -299,5 +393,93 @@ mod tests {
         assert_eq!(PlanStepStatus::Pending, PlanStepStatus::Pending);
         assert_ne!(PlanStepStatus::Pending, PlanStepStatus::Completed);
         assert_ne!(PlanStepStatus::InProgress, PlanStepStatus::Failed);
+    }
+
+    #[tokio::test]
+    async fn test_plan_executor_success() {
+        let executor = PlanExecutor::new(2);
+        let mut plan = Plan::new("plan1", "Test plan")
+            .add_step(PlanStep::new("s1", "Step 1", vec![]))
+            .add_step(PlanStep::new("s2", "Step 2", vec!["s1".to_string()]));
+
+        let result = executor
+            .execute(
+                &mut plan,
+                |desc| async move { Ok(format!("done: {}", desc)) },
+            )
+            .await
+            .unwrap();
+
+        assert!(result.success);
+        assert_eq!(result.step_results.len(), 2);
+        assert!(result.replanned_steps.is_empty());
+
+        // Verify steps are marked completed
+        assert_eq!(plan.steps[0].status, PlanStepStatus::Completed);
+        assert_eq!(plan.steps[1].status, PlanStepStatus::Completed);
+    }
+
+    #[tokio::test]
+    async fn test_plan_executor_failure_after_retries() {
+        let executor = PlanExecutor::new(1);
+        let mut plan =
+            Plan::new("plan1", "Test plan").add_step(PlanStep::new("s1", "Failing step", vec![]));
+
+        let result = executor
+            .execute(&mut plan, |_desc| async move {
+                Err::<String, String>("always fails".to_string())
+            })
+            .await
+            .unwrap();
+
+        assert!(!result.success);
+        assert_eq!(plan.steps[0].status, PlanStepStatus::Failed);
+        assert!(!result.replanned_steps.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_plan_executor_retry_then_succeed() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+
+        let executor = PlanExecutor::new(2);
+        let mut plan =
+            Plan::new("plan1", "Test").add_step(PlanStep::new("s1", "Flaky step", vec![]));
+
+        let attempt_count = Arc::new(AtomicU32::new(0));
+        let attempt_count_clone = attempt_count.clone();
+
+        let result = executor
+            .execute(&mut plan, move |_desc| {
+                let ac = attempt_count_clone.clone();
+                async move {
+                    let attempt = ac.fetch_add(1, Ordering::SeqCst);
+                    if attempt < 2 {
+                        Err("transient error".to_string())
+                    } else {
+                        Ok("success on retry".to_string())
+                    }
+                }
+            })
+            .await
+            .unwrap();
+
+        assert!(result.success);
+        assert_eq!(attempt_count.load(Ordering::SeqCst), 3); // 1 initial + 2 retries
+        assert!(!result.replanned_steps.is_empty()); // Steps were replanned
+    }
+
+    #[tokio::test]
+    async fn test_plan_executor_circular_dependency_error() {
+        let executor = PlanExecutor::new(0);
+        let mut plan = Plan::new("plan1", "Test")
+            .add_step(PlanStep::new("a", "A", vec!["b".to_string()]))
+            .add_step(PlanStep::new("b", "B", vec!["a".to_string()]));
+
+        let result = executor
+            .execute(&mut plan, |_| async { Ok("done".to_string()) })
+            .await;
+
+        assert!(result.is_err());
     }
 }

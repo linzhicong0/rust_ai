@@ -44,10 +44,14 @@
 
 pub mod agent;
 pub mod builder;
+pub mod communication;
 pub mod delegate;
+pub mod lifecycle;
 pub mod planner;
 
 pub use agent::Agent;
 pub use builder::AgentBuilder;
+pub use communication::{AgentMailbox, MessageBus, MessageEnvelope};
 pub use delegate::{DelegateTool, DelegationWorker};
-pub use planner::{Plan, PlanResult, PlanStep, PlanStepStatus};
+pub use lifecycle::{AgentLifecycle, AgentState, PersistedAgentState, StateTransitionError};
+pub use planner::{Plan, PlanExecutor, PlanResult, PlanStep, PlanStepStatus};

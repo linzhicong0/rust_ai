@@ -48,6 +48,7 @@
 //! # }
 //! ```
 
+pub mod async_task;
 pub mod context;
 pub mod dag;
 pub mod human_approval;
@@ -55,6 +56,7 @@ pub mod pipeline;
 pub mod step;
 
 // Re-export main types for convenience
+pub use async_task::{spawn_task, AsyncTaskBuilder, TaskEvent, TaskHandle, TaskStatus};
 pub use context::PipelineContext;
 pub use human_approval::{
     ApprovalCallback, ApprovalDecision, ApprovalRequest, ApprovalResult, HumanApproval,
