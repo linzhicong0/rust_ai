@@ -93,6 +93,12 @@ pub use crate::structured::{
     StructuredOutputError, StructuredOutputValidator,
 };
 
+// Re-export structured data (REQ-8.5)
+pub use crate::structured_data::{
+    convert, parse_csv, parse_json, parse_tsv, to_csv, to_json, ColumnType, DataFormat, DataRow,
+    DataSchema, StructuredData, StructuredDataError,
+};
+
 // Re-export output formatting (REQ-9.4)
 pub use crate::output_format::{format_output, OutputFormat, OutputFormatConfig};
 
@@ -144,6 +150,7 @@ pub mod prompt_registry;
 pub mod provider;
 pub mod rate_limit;
 pub mod structured;
+pub mod structured_data;
 pub mod system_prompt;
 pub mod template;
 pub mod tool;
