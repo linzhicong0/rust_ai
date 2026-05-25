@@ -50,11 +50,16 @@
 
 pub mod context;
 pub mod dag;
+pub mod human_approval;
 pub mod pipeline;
 pub mod step;
 
 // Re-export main types for convenience
 pub use context::PipelineContext;
+pub use human_approval::{
+    ApprovalCallback, ApprovalDecision, ApprovalRequest, ApprovalResult, HumanApproval,
+    TimeoutPolicy,
+};
 pub use pipeline::{Pipeline, PipelineBuilder, TrackedTaskOutput};
 pub use step::{
     BackoffStrategy, Condition, LoopCondition, RetryPolicy, Step, StepKind, Task, TaskBuilder,
