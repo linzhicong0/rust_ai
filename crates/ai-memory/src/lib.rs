@@ -38,6 +38,8 @@
 //! ```
 
 pub mod agent;
+pub mod expiring;
+pub mod hierarchical;
 pub mod in_memory;
 pub mod long_term;
 pub mod scoped;

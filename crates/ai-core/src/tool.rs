@@ -43,6 +43,7 @@
 //! ```
 
 use async_trait::async_trait;
+use jsonschema::Validator;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -338,6 +339,137 @@ impl ToolRegistry {
     /// Check if a tool is registered.
     pub fn contains(&self, name: &str) -> bool {
         self.tools.contains_key(name)
+    }
+}
+
+/// Result of tool input validation.
+#[derive(Debug, Clone)]
+pub struct ValidationError {
+    /// Path to the invalid field (e.g., "properties.name").
+    pub path: String,
+    /// Descriptive error message.
+    pub message: String,
+}
+
+impl std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.path, self.message)
+    }
+}
+
+/// Coerce compatible types in tool input to match the schema.
+///
+/// For example, a string "5" will be coerced to integer 5 if the schema
+/// expects an integer type.
+pub fn coerce_input(input: &Value, schema: &Value) -> Value {
+    match schema.get("type").and_then(|t| t.as_str()) {
+        Some("object") => {
+            if let Value::Object(map) = input {
+                let properties = schema
+                    .get("properties")
+                    .and_then(|p| p.as_object())
+                    .cloned()
+                    .unwrap_or_default();
+                let mut result = serde_json::Map::new();
+                for (key, value) in map {
+                    if let Some(prop_schema) = properties.get(key) {
+                        result.insert(key.clone(), coerce_input(value, prop_schema));
+                    } else {
+                        result.insert(key.clone(), value.clone());
+                    }
+                }
+                Value::Object(result)
+            } else {
+                input.clone()
+            }
+        }
+        Some("integer") | Some("number") => {
+            if let Value::String(s) = input {
+                if let Ok(n) = s.parse::<i64>() {
+                    Value::Number(serde_json::Number::from(n))
+                } else if let Ok(n) = s.parse::<f64>() {
+                    serde_json::Number::from_f64(n)
+                        .map(Value::Number)
+                        .unwrap_or_else(|| input.clone())
+                } else {
+                    input.clone()
+                }
+            } else {
+                input.clone()
+            }
+        }
+        Some("boolean") => {
+            if let Value::String(s) = input {
+                match s.as_str() {
+                    "true" => Value::Bool(true),
+                    "false" => Value::Bool(false),
+                    _ => input.clone(),
+                }
+            } else {
+                input.clone()
+            }
+        }
+        Some("string") => match input {
+            Value::Number(n) => Value::String(n.to_string()),
+            Value::Bool(b) => Value::String(b.to_string()),
+            _ => input.clone(),
+        },
+        Some("array") => {
+            if let Value::Array(arr) = input {
+                let item_schema = schema
+                    .get("items")
+                    .cloned()
+                    .unwrap_or(Value::Object(serde_json::Map::new()));
+                let coerced: Vec<Value> = arr
+                    .iter()
+                    .map(|item| coerce_input(item, &item_schema))
+                    .collect();
+                Value::Array(coerced)
+            } else {
+                input.clone()
+            }
+        }
+        _ => input.clone(),
+    }
+}
+
+/// Validate tool input against its JSON Schema.
+///
+/// Returns `Ok(coerced_input)` if valid (after type coercion), or `Err` with
+/// a descriptive error including the path to the invalid field.
+pub fn validate_tool_input(input: &Value, schema: &Value) -> Result<Value, ToolError> {
+    // First, coerce compatible types
+    let coerced = coerce_input(input, schema);
+
+    // Then validate against schema
+    let validator = Validator::new(schema)
+        .map_err(|e| ToolError::InvalidInput(format!("Invalid schema: {}", e)))?;
+
+    if validator.is_valid(&coerced) {
+        Ok(coerced)
+    } else {
+        // Collect validation errors with paths
+        let errors: Vec<ValidationError> = validator
+            .iter_errors(&coerced)
+            .map(|error| {
+                let path = error.instance_path.to_string();
+                let path = if path.is_empty() {
+                    error.schema_path.to_string()
+                } else {
+                    path
+                };
+                ValidationError {
+                    path,
+                    message: error.to_string(),
+                }
+            })
+            .collect();
+
+        if let Some(first) = errors.first() {
+            Err(ToolError::InvalidInput(format!("{}", first)))
+        } else {
+            Err(ToolError::InvalidInput("Validation failed".to_string()))
+        }
     }
 }
 
@@ -657,5 +789,117 @@ mod tests {
         assert!(registry.list().is_empty());
         assert!(registry.descriptors().is_empty());
         assert!(registry.get("anything").is_none());
+    }
+
+    // REQ-3.4: Tool Validation Tests
+
+    #[test]
+    fn test_valid_input_passes_validation_and_execution_proceeds() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "integer"}
+            },
+            "required": ["name", "age"]
+        });
+
+        let input = json!({"name": "Alice", "age": 30});
+        let result = validate_tool_input(&input, &schema);
+        assert!(result.is_ok());
+        let coerced = result.unwrap();
+        assert_eq!(coerced["name"], "Alice");
+        assert_eq!(coerced["age"], 30);
+    }
+
+    #[test]
+    fn test_missing_required_field_returns_error_with_field_path() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "integer"}
+            },
+            "required": ["name", "age"]
+        });
+
+        let input = json!({"age": 30}); // missing "name"
+        let result = validate_tool_input(&input, &schema);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        // Error should mention the missing required field
+        assert!(
+            err_msg.contains("name") || err_msg.contains("required"),
+            "Error should reference the missing field: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_string_5_for_integer_field_is_coerced_to_5() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "count": {"type": "integer"}
+            },
+            "required": ["count"]
+        });
+
+        let input = json!({"count": "5"});
+        let result = validate_tool_input(&input, &schema);
+        assert!(result.is_ok());
+        let coerced = result.unwrap();
+        assert_eq!(coerced["count"], 5);
+    }
+
+    #[test]
+    fn test_invalid_type_returns_descriptive_type_error() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"}
+            },
+            "required": ["name"]
+        });
+
+        // Pass an object where a string is expected
+        let input = json!({"name": {"nested": "object"}});
+        let result = validate_tool_input(&input, &schema);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        // Error should reference the path and type mismatch
+        assert!(
+            err_msg.contains("name") || err_msg.contains("type") || err_msg.contains("string"),
+            "Error should describe type mismatch: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_coerce_string_to_number() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "value": {"type": "number"}
+            }
+        });
+        let input = json!({"value": "3.14"});
+        let coerced = coerce_input(&input, &schema);
+        assert_eq!(coerced["value"], 3.14);
+    }
+
+    #[test]
+    fn test_coerce_string_to_boolean() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "flag": {"type": "boolean"}
+            }
+        });
+        let input = json!({"flag": "true"});
+        let coerced = coerce_input(&input, &schema);
+        assert_eq!(coerced["flag"], true);
     }
 }
