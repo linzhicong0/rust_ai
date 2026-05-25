@@ -117,6 +117,14 @@ pub use crate::typed::{
 // Re-export system prompt builder (REQ-4.4)
 pub use crate::system_prompt::SystemPromptBuilder;
 
+// Re-export tool composition (REQ-3.5)
+pub use crate::tool_compose::{ComposedTool, IntermediateResult, ToolPipeExt, ToolPipeline};
+
+// Re-export prompt registry (REQ-4.2)
+pub use crate::prompt_registry::{
+    AbTestConfig, AbVariant, PromptDiff, PromptRegistry, PromptVersion,
+};
+
 // Module declarations
 pub mod client;
 pub mod config;
@@ -132,12 +140,14 @@ pub mod output_format;
 pub mod plugin;
 pub mod prompt_cache;
 pub mod prompt_injection;
+pub mod prompt_registry;
 pub mod provider;
 pub mod rate_limit;
 pub mod structured;
 pub mod system_prompt;
 pub mod template;
 pub mod tool;
+pub mod tool_compose;
 pub mod typed;
 pub mod types;
 

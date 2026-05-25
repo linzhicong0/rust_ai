@@ -77,6 +77,11 @@ pub struct ToolDescriptor {
     ///
     /// Used for structured output validation.
     pub output_schema: Option<Value>,
+
+    /// Tags for categorizing and querying tools (REQ-3.2).
+    ///
+    /// Tags enable filtering tools by capability, e.g., `["search", "web"]`.
+    pub tags: Vec<String>,
 }
 
 impl ToolDescriptor {
@@ -91,12 +96,25 @@ impl ToolDescriptor {
             description: description.into(),
             input_schema,
             output_schema: None,
+            tags: Vec::new(),
         }
     }
 
     /// Set the output schema for structured output validation.
     pub fn with_output_schema(mut self, schema: Value) -> Self {
         self.output_schema = Some(schema);
+        self
+    }
+
+    /// Add tags to this descriptor for discovery and querying (REQ-3.2).
+    pub fn with_tags(mut self, tags: Vec<impl Into<String>>) -> Self {
+        self.tags = tags.into_iter().map(|t| t.into()).collect();
+        self
+    }
+
+    /// Add a single tag.
+    pub fn with_tag(mut self, tag: impl Into<String>) -> Self {
+        self.tags.push(tag.into());
         self
     }
 }
@@ -321,6 +339,22 @@ impl ToolRegistry {
         self.tools.insert(name, Box::new(tool));
     }
 
+    /// Try to register a tool, returning an error if a duplicate name exists (REQ-3.2).
+    ///
+    /// This is the non-panicking variant suitable for runtime/plugin registration.
+    pub fn try_register<T: Tool + 'static>(&mut self, tool: T) -> Result<(), ToolError> {
+        let descriptor = tool.descriptor();
+        let name = descriptor.name.clone();
+        if self.tools.contains_key(&name) {
+            return Err(ToolError::InvalidInput(format!(
+                "Tool already registered: {}",
+                name
+            )));
+        }
+        self.tools.insert(name, Box::new(tool));
+        Ok(())
+    }
+
     /// Get a tool by name.
     pub fn get(&self, name: &str) -> Option<&dyn Tool> {
         self.tools.get(name).map(|t| t.as_ref())
@@ -339,6 +373,35 @@ impl ToolRegistry {
     /// Check if a tool is registered.
     pub fn contains(&self, name: &str) -> bool {
         self.tools.contains_key(name)
+    }
+
+    /// Query tools by tag (REQ-3.2).
+    ///
+    /// Returns all tools that have the specified tag in their descriptor.
+    pub fn query_by_tag(&self, tag: &str) -> Vec<&dyn Tool> {
+        self.tools
+            .values()
+            .filter(|t| t.descriptor().tags.contains(&tag.to_string()))
+            .map(|t| t.as_ref())
+            .collect()
+    }
+
+    /// Query tools by capability substring match in description (REQ-3.2).
+    ///
+    /// Returns all tools whose description contains the given capability string
+    /// (case-insensitive).
+    pub fn query_by_capability(&self, capability: &str) -> Vec<&dyn Tool> {
+        let capability_lower = capability.to_lowercase();
+        self.tools
+            .values()
+            .filter(|t| {
+                t.descriptor()
+                    .description
+                    .to_lowercase()
+                    .contains(&capability_lower)
+            })
+            .map(|t| t.as_ref())
+            .collect()
     }
 }
 
@@ -901,5 +964,138 @@ mod tests {
         let input = json!({"flag": "true"});
         let coerced = coerce_input(&input, &schema);
         assert_eq!(coerced["flag"], true);
+    }
+
+    // REQ-3.2: Tool Discovery Tests
+
+    struct TaggedSearchTool;
+
+    #[async_trait::async_trait]
+    impl Tool for TaggedSearchTool {
+        fn descriptor(&self) -> ToolDescriptor {
+            ToolDescriptor::new(
+                "web_search",
+                "Search the web for information",
+                json!({"type": "object"}),
+            )
+            .with_tags(vec!["search", "web"])
+        }
+
+        async fn execute(&self, _input: Value) -> Result<ToolOutput, ToolError> {
+            Ok(ToolOutput::success("search result"))
+        }
+    }
+
+    struct TaggedDbTool;
+
+    #[async_trait::async_trait]
+    impl Tool for TaggedDbTool {
+        fn descriptor(&self) -> ToolDescriptor {
+            ToolDescriptor::new(
+                "db_search",
+                "Search the database",
+                json!({"type": "object"}),
+            )
+            .with_tags(vec!["search", "database"])
+        }
+
+        async fn execute(&self, _input: Value) -> Result<ToolOutput, ToolError> {
+            Ok(ToolOutput::success("db result"))
+        }
+    }
+
+    struct TaggedFileTool;
+
+    #[async_trait::async_trait]
+    impl Tool for TaggedFileTool {
+        fn descriptor(&self) -> ToolDescriptor {
+            ToolDescriptor::new("file_read", "Read a file", json!({"type": "object"}))
+                .with_tags(vec!["file", "io"])
+        }
+
+        async fn execute(&self, _input: Value) -> Result<ToolOutput, ToolError> {
+            Ok(ToolOutput::success("file content"))
+        }
+    }
+
+    // REQ-3.2: Unit: register a tool and retrieve it by exact name
+    #[test]
+    fn test_register_and_retrieve_by_name() {
+        let mut registry = ToolRegistry::new();
+        registry.register(TaggedSearchTool);
+
+        let tool = registry.get("web_search");
+        assert!(tool.is_some());
+        assert_eq!(tool.unwrap().descriptor().name, "web_search");
+    }
+
+    // REQ-3.2: Unit: list() returns all registered tools
+    #[test]
+    fn test_list_returns_all_tools() {
+        let mut registry = ToolRegistry::new();
+        registry.register(TaggedSearchTool);
+        registry.register(TaggedDbTool);
+        registry.register(TaggedFileTool);
+
+        let mut names = registry.list();
+        names.sort();
+        assert_eq!(names, vec!["db_search", "file_read", "web_search"]);
+    }
+
+    // REQ-3.2: Unit: query by tag "search" returns all tools with that tag
+    #[test]
+    fn test_query_by_tag_search() {
+        let mut registry = ToolRegistry::new();
+        registry.register(TaggedSearchTool);
+        registry.register(TaggedDbTool);
+        registry.register(TaggedFileTool);
+
+        let search_tools = registry.query_by_tag("search");
+        assert_eq!(search_tools.len(), 2);
+
+        let names: Vec<String> = search_tools.iter().map(|t| t.descriptor().name).collect();
+        assert!(names.contains(&"web_search".to_string()));
+        assert!(names.contains(&"db_search".to_string()));
+    }
+
+    // REQ-3.2: Unit: plugin registers a tool at runtime and it appears in list()
+    #[test]
+    fn test_runtime_registration_appears_in_list() {
+        let mut registry = ToolRegistry::new();
+        registry.register(TaggedSearchTool);
+
+        // Simulate plugin runtime registration
+        let result = registry.try_register(TaggedDbTool);
+        assert!(result.is_ok());
+
+        let names = registry.list();
+        assert!(names.contains(&"web_search".to_string()));
+        assert!(names.contains(&"db_search".to_string()));
+    }
+
+    // REQ-3.2: Unit: registering duplicate name returns an error
+    #[test]
+    fn test_try_register_duplicate_returns_error() {
+        let mut registry = ToolRegistry::new();
+        registry.register(TaggedSearchTool);
+
+        // Create another tool with same name
+        struct DuplicateTool;
+
+        #[async_trait::async_trait]
+        impl Tool for DuplicateTool {
+            fn descriptor(&self) -> ToolDescriptor {
+                ToolDescriptor::new("web_search", "Duplicate", json!({"type": "object"}))
+            }
+
+            async fn execute(&self, _input: Value) -> Result<ToolOutput, ToolError> {
+                Ok(ToolOutput::success(""))
+            }
+        }
+
+        let result = registry.try_register(DuplicateTool);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("web_search"));
     }
 }

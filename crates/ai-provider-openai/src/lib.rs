@@ -694,6 +694,7 @@ mod tests {
                 }
             }),
             output_schema: None,
+            tags: Vec::new(),
         }];
 
         let openai_tools = OpenAiProvider::convert_tools(&tools);
@@ -712,12 +713,14 @@ mod tests {
                 description: "Search the web".to_string(),
                 input_schema: serde_json::json!({"type": "object"}),
                 output_schema: None,
+                tags: Vec::new(),
             },
             ToolDescriptor {
                 name: "calculator".to_string(),
                 description: "Calculate".to_string(),
                 input_schema: serde_json::json!({"type": "object"}),
                 output_schema: None,
+                tags: Vec::new(),
             },
         ];
 
