@@ -81,7 +81,8 @@ pub use crate::client::{Client, TrackedCompletionResponse};
 // Re-export errors — users typically import these via `use ai_core::Error`
 // or use specific error variants like `ProviderError`
 pub use crate::error::{
-    AgentError, EmbedderError, GuardrailError, MemoryError, PipelineError, ProviderError, ToolError,
+    AgentError, EmbedderError, GuardrailError, MemoryError, PipelineError, ProviderError,
+    ScorerError, ToolError,
 };
 
 // Re-export template engine
@@ -156,6 +157,12 @@ pub use crate::regression::{
     RegressionTestResult, SimilarityStrategy,
 };
 
+// Re-export quality metrics (REQ-10.5)
+pub use crate::scorer::{
+    FaithfulnessScorer, LengthScorer, LlmJudgeScorer, RelevanceScorer, Scorer, ScorerPipeline,
+    ScorerPipelineResult, ScorerResult,
+};
+
 // Re-export prompt registry (REQ-4.2)
 pub use crate::prompt_registry::{
     AbTestConfig, AbVariant, PromptDiff, PromptRegistry, PromptVersion,
@@ -184,6 +191,7 @@ pub mod prompt_registry;
 pub mod provider;
 pub mod rate_limit;
 pub mod regression;
+pub mod scorer;
 pub mod structured;
 pub mod structured_data;
 pub mod system_prompt;
@@ -211,6 +219,7 @@ pub mod prelude {
     pub use crate::embedder::Embedder;
     pub use crate::memory::{Memory, MemoryEntry, ScopedMemory};
     pub use crate::provider::Provider;
+    pub use crate::scorer::{Scorer, ScorerPipeline};
     pub use crate::tool::{Tool, ToolDescriptor};
 
     // Configuration
@@ -269,6 +278,7 @@ mod tests {
         let _embedder_err = EmbedderError::Model("test".to_string());
         let _guardrail_err = GuardrailError::Check("test".to_string());
         let _pipeline_err = PipelineError::Context("test".to_string());
+        let _scorer_err = ScorerError::EmptyPipeline;
     }
 
     #[test]
