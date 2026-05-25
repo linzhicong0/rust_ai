@@ -683,6 +683,7 @@ mod tests {
                 }
             }),
             output_schema: None,
+            tags: Vec::new(),
         }];
 
         let anthropic_tools = AnthropicProvider::convert_tools(&tools);
@@ -700,12 +701,14 @@ mod tests {
                 description: "Search the web".to_string(),
                 input_schema: serde_json::json!({"type": "object"}),
                 output_schema: None,
+                tags: Vec::new(),
             },
             ToolDescriptor {
                 name: "calculator".to_string(),
                 description: "Perform calculations".to_string(),
                 input_schema: serde_json::json!({"type": "object"}),
                 output_schema: None,
+                tags: Vec::new(),
             },
         ];
 

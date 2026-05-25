@@ -217,6 +217,7 @@ where
                 "required": ["task"]
             }),
             output_schema: None,
+            tags: Vec::new(),
         }
     }
 
