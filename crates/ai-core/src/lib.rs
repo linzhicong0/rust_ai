@@ -146,7 +146,7 @@ pub use crate::benchmark::{
 
 // Re-export A/B testing (REQ-10.2)
 pub use crate::ab_testing::{
-    AbTestCollector, AbTestConfig as AbTestExperimentConfig, AbTestError, Observation,
+    AbTestCollector, AbTestConfig as ExperimentConfig, AbTestError, Observation,
     SignificanceResult, TestVariant, VariantAssigner, VariantMetrics,
 };
 
