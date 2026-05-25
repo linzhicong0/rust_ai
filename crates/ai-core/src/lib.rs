@@ -126,12 +126,45 @@ pub use crate::system_prompt::SystemPromptBuilder;
 // Re-export tool composition (REQ-3.5)
 pub use crate::tool_compose::{ComposedTool, IntermediateResult, ToolPipeExt, ToolPipeline};
 
+// Re-export image generation (REQ-8.2)
+pub use crate::image_gen::{
+    GeneratedImage, ImageData, ImageEditConfig, ImageFormat, ImageGenConfig, ImageGenError,
+    ImageGenerator, ImageMessage, ImageQuality, ImageSize, ImageStyle,
+};
+
+// Re-export audio processing (REQ-8.3)
+pub use crate::audio::{
+    AudioError, AudioFormat, Language, SynthesisResult, SynthesizeConfig, Synthesizer, TimedWord,
+    TranscribeConfig, Transcriber, TranscriptResult, TranscriptSegment, Voice, VoiceGender,
+};
+
+// Re-export benchmarking (REQ-10.1)
+pub use crate::benchmark::{
+    BenchmarkConfig, BenchmarkError, BenchmarkMetrics, BenchmarkRun, BenchmarkRunner, CaseResult,
+    EvalCase, EvalDataset, RunComparison,
+};
+
+// Re-export A/B testing (REQ-10.2)
+pub use crate::ab_testing::{
+    AbTestCollector, AbTestConfig as AbTestExperimentConfig, AbTestError, Observation,
+    SignificanceResult, TestVariant, VariantAssigner, VariantMetrics,
+};
+
+// Re-export regression testing (REQ-10.3)
+pub use crate::regression::{
+    CaseTestResult, GoldenCase, GoldenDataset, RegressionConfig, RegressionError, RegressionRunner,
+    RegressionTestResult, SimilarityStrategy,
+};
+
 // Re-export prompt registry (REQ-4.2)
 pub use crate::prompt_registry::{
     AbTestConfig, AbVariant, PromptDiff, PromptRegistry, PromptVersion,
 };
 
 // Module declarations
+pub mod ab_testing;
+pub mod audio;
+pub mod benchmark;
 pub mod client;
 pub mod config;
 pub mod context;
@@ -140,6 +173,7 @@ pub mod embedder;
 pub mod error;
 pub mod guardrail;
 pub mod hot_reload;
+pub mod image_gen;
 pub mod memory;
 pub mod model_registry;
 pub mod output_format;
@@ -149,6 +183,7 @@ pub mod prompt_injection;
 pub mod prompt_registry;
 pub mod provider;
 pub mod rate_limit;
+pub mod regression;
 pub mod structured;
 pub mod structured_data;
 pub mod system_prompt;
