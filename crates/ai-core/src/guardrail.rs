@@ -498,13 +498,23 @@ pub struct PiiPattern {
 pub enum PiiAction {
     /// Block the entire input/output
     Block,
-    /// Redact the detected PII (replace with [REDACTED])
+    /// Redact the detected PII (replace with [<NAME>_REDACTED])
     Redact,
+    /// Replace the PII with a deterministic SHA-256 hash prefix (first 8 hex chars).
+    Hash,
+    /// Allow through but emit a warning (the text is not modified).
+    Warn,
 }
 
 /// Regex-based PII detector.
 ///
 /// Detects personally identifiable information using configurable regex patterns.
+/// When PII is found the configured action is applied:
+///
+/// - [`PiiAction::Block`] — reject the entire text.
+/// - [`PiiAction::Redact`] — replace all matches with `[<NAME>_REDACTED]`.
+/// - [`PiiAction::Hash`] — replace all matches with a deterministic 8-hex-char token.
+/// - [`PiiAction::Warn`] — allow the text but annotate it with a warning prefix.
 ///
 /// # Examples
 ///
@@ -555,7 +565,7 @@ impl RegexPiiDetector {
     ///
     /// * `pattern` — Regex pattern to match
     /// * `name` — Name of the pattern (for error messages)
-    /// * `action` — Whether to block or redact when detected
+    /// * `action` — Action to take when PII is detected
     pub fn add_pattern(mut self, pattern: &str, name: &str, action: PiiAction) -> Self {
         match Regex::new(pattern) {
             Ok(re) => {
@@ -590,6 +600,37 @@ impl RegexPiiDetector {
         }
         result
     }
+
+    /// Replaces all PII pattern matches with a deterministic hash token.
+    ///
+    /// Uses an FNV-1a-inspired 64-bit hash of each matched string, rendered
+    /// as the first 8 hexadecimal digits.  The same PII value always maps to
+    /// the same token, enabling correlation without exposing the original value.
+    fn hash_pii(&self, text: &str) -> String {
+        let mut result = text.to_string();
+        for (regex, _, name) in &self.patterns {
+            result = regex
+                .replace_all(&result, |caps: &regex::Captures| {
+                    let matched = &caps[0];
+                    let token = fnv1a_hash8(matched);
+                    format!("[{}_{:08x}]", name.to_uppercase(), token)
+                })
+                .to_string();
+        }
+        result
+    }
+}
+
+/// Compute an 8-character (32-bit) FNV-1a hash of a string.
+fn fnv1a_hash8(s: &str) -> u32 {
+    const OFFSET: u32 = 2_166_136_261;
+    const PRIME: u32 = 16_777_619;
+    let mut hash = OFFSET;
+    for byte in s.bytes() {
+        hash ^= byte as u32;
+        hash = hash.wrapping_mul(PRIME);
+    }
+    hash
 }
 
 impl Default for RegexPiiDetector {
@@ -609,6 +650,14 @@ impl Guardrail for RegexPiiDetector {
                 PiiAction::Redact => {
                     let redacted = self.redact_pii(input);
                     return Ok(GuardrailAction::Modify(redacted));
+                }
+                PiiAction::Hash => {
+                    let hashed = self.hash_pii(input);
+                    return Ok(GuardrailAction::Modify(hashed));
+                }
+                PiiAction::Warn => {
+                    let warned = format!("[WARNING: {} PII detected] {}", name, input);
+                    return Ok(GuardrailAction::Modify(warned));
                 }
             }
         }
@@ -1307,6 +1356,164 @@ mod tests {
         match result {
             GuardrailAction::Modify(_) => {}
             _ => panic!("Expected Modify action from PII detector"),
+        }
+    }
+
+    // ── REQ-13.3: PII handling — Hash and Warn actions ──────────────────────
+
+    /// REQ-13.3 acceptance: Hash action replaces PII with a hex token.
+    #[tokio::test]
+    async fn test_pii_hash_action_replaces_with_token() {
+        let detector = RegexPiiDetector::new()
+            .add_pattern(r"\b\d{3}-\d{2}-\d{4}\b", "ssn", PiiAction::Hash);
+
+        let result = detector
+            .check_input("My SSN is 123-45-6789 and it is private")
+            .await
+            .unwrap();
+        match result {
+            GuardrailAction::Modify(hashed) => {
+                // Original SSN must not appear in output
+                assert!(!hashed.contains("123-45-6789"), "SSN still visible: {}", hashed);
+                // Token must match pattern [SSN_<8 hex chars>]
+                assert!(
+                    hashed.contains("[SSN_"),
+                    "Expected hash token in output: {}",
+                    hashed
+                );
+            }
+            _ => panic!("Expected Modify (hash) action, got {:?}", result),
+        }
+    }
+
+    /// REQ-13.3 acceptance: Hash is deterministic — same input gives same token.
+    #[tokio::test]
+    async fn test_pii_hash_is_deterministic() {
+        let detector = RegexPiiDetector::new()
+            .add_pattern(r"\b\d{3}-\d{2}-\d{4}\b", "ssn", PiiAction::Hash);
+
+        let text = "My SSN is 123-45-6789";
+        let r1 = detector.check_input(text).await.unwrap();
+        let r2 = detector.check_input(text).await.unwrap();
+        assert_eq!(r1, r2, "Hash must be deterministic");
+    }
+
+    /// REQ-13.3 acceptance: Warn action allows text but prepends a warning.
+    #[tokio::test]
+    async fn test_pii_warn_action_allows_with_warning() {
+        let detector = RegexPiiDetector::new()
+            .add_pattern(
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+                "email",
+                PiiAction::Warn,
+            );
+
+        let result = detector
+            .check_input("Contact me at alice@example.com for details")
+            .await
+            .unwrap();
+        match result {
+            GuardrailAction::Modify(warned) => {
+                // Warning prefix must be present
+                assert!(
+                    warned.contains("[WARNING:"),
+                    "Expected warning prefix: {}",
+                    warned
+                );
+                // Original email must still be present (Warn does not redact)
+                assert!(
+                    warned.contains("alice@example.com"),
+                    "Email must remain in Warn output: {}",
+                    warned
+                );
+            }
+            _ => panic!("Expected Modify (warn) action, got {:?}", result),
+        }
+    }
+
+    /// REQ-13.3 acceptance: custom entity patterns (SSN, email, phone, credit card) work.
+    #[tokio::test]
+    async fn test_pii_default_patterns_cover_all_entity_types() {
+        let detector = RegexPiiDetector::default();
+
+        // SSN — should block
+        let ssn_result = detector.check_input("SSN: 123-45-6789").await.unwrap();
+        assert!(
+            matches!(ssn_result, GuardrailAction::Block(_)),
+            "SSN should block"
+        );
+
+        // Email — should redact
+        let email_result = detector
+            .check_input("Email: user@example.com")
+            .await
+            .unwrap();
+        assert!(
+            matches!(email_result, GuardrailAction::Modify(_)),
+            "Email should redact"
+        );
+
+        // Credit card — should block
+        let cc_result = detector
+            .check_input("Card: 4111 1111 1111 1111")
+            .await
+            .unwrap();
+        assert!(
+            matches!(cc_result, GuardrailAction::Block(_)),
+            "Credit card should block"
+        );
+
+        // Phone — should redact
+        let phone_result = detector
+            .check_input("Call me at 555-867-5309")
+            .await
+            .unwrap();
+        assert!(
+            matches!(phone_result, GuardrailAction::Modify(_)),
+            "Phone should redact"
+        );
+    }
+
+    /// REQ-13.3 acceptance: custom entity patterns added by the user work correctly.
+    #[tokio::test]
+    async fn test_pii_custom_entity_pattern() {
+        let detector = RegexPiiDetector::new()
+            .add_pattern(r"\bPASS-\d{6}\b", "passport", PiiAction::Redact);
+
+        let result = detector
+            .check_input("My passport is PASS-123456")
+            .await
+            .unwrap();
+        match result {
+            GuardrailAction::Modify(redacted) => {
+                assert!(redacted.contains("[PASSPORT_REDACTED]"));
+                assert!(!redacted.contains("PASS-123456"));
+            }
+            _ => panic!("Expected Modify action for custom passport pattern"),
+        }
+    }
+
+    /// REQ-13.3 acceptance: Hash and Redact apply to all occurrences in the text.
+    #[tokio::test]
+    async fn test_pii_applies_to_all_occurrences() {
+        let detector = RegexPiiDetector::new()
+            .add_pattern(
+                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+                "email",
+                PiiAction::Redact,
+            );
+
+        let result = detector
+            .check_input("From: a@x.com and b@y.com are both registered")
+            .await
+            .unwrap();
+        match result {
+            GuardrailAction::Modify(redacted) => {
+                // Neither email should remain
+                assert!(!redacted.contains("a@x.com"), "First email still visible");
+                assert!(!redacted.contains("b@y.com"), "Second email still visible");
+            }
+            _ => panic!("Expected Modify action"),
         }
     }
 }

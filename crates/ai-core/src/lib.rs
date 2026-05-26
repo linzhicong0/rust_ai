@@ -168,12 +168,16 @@ pub use crate::prompt_registry::{
     AbTestConfig, AbVariant, PromptDiff, PromptRegistry, PromptVersion,
 };
 
+// Re-export content filtering (REQ-13.2)
+pub use crate::content_filter::{ContentFilter, FilterAction, FilterCategory, FilterResult, FilterSeverity};
+
 // Module declarations
 pub mod ab_testing;
 pub mod audio;
 pub mod benchmark;
 pub mod client;
 pub mod config;
+pub mod content_filter;
 pub mod context;
 pub mod cost;
 pub mod embedder;
