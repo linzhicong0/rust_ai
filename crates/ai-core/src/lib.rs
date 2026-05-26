@@ -171,15 +171,34 @@ pub use crate::prompt_registry::{
 // Re-export content filtering (REQ-13.2)
 pub use crate::content_filter::{ContentFilter, FilterAction, FilterCategory, FilterResult, FilterSeverity};
 
+// Re-export horizontal scaling (REQ-14.2)
+pub use crate::scaling::{
+    InMemoryTaskQueue, InMemoryWorkerRegistry, ScalingError, Task, TaskQueue, TaskResult,
+    TaskStatus, WorkerHealth, WorkerInfo, WorkerRegistry,
+};
+
+// Re-export data sources (REQ-17.1)
+pub use crate::data_source::{
+    DataQuery, DataRecord, DataSource, DataSourceError, DataSourceType, InMemoryDataSource,
+};
+
+// Re-export communication platforms (REQ-17.2)
+pub use crate::channel::{
+    Attachment, Channel, ChannelError, ChannelMessage, InMemoryChannel, PlatformType, SendOptions,
+    normalize_message,
+};
+
 // Module declarations
 pub mod ab_testing;
 pub mod audio;
 pub mod benchmark;
+pub mod channel;
 pub mod client;
 pub mod config;
 pub mod content_filter;
 pub mod context;
 pub mod cost;
+pub mod data_source;
 pub mod embedder;
 pub mod error;
 pub mod guardrail;
@@ -195,6 +214,7 @@ pub mod prompt_registry;
 pub mod provider;
 pub mod rate_limit;
 pub mod regression;
+pub mod scaling;
 pub mod scorer;
 pub mod structured;
 pub mod structured_data;
