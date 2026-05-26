@@ -19,6 +19,7 @@
 //! let _ = action;
 //! ```
 
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 // ── Category ──────────────────────────────────────────────────────────────────
@@ -92,50 +93,56 @@ struct FilterRule {
 
 // ── Built-in keyword sets ─────────────────────────────────────────────────────
 
-fn violence_keywords_high() -> &'static [&'static str] {
-    &[
-        "kill", "murder", "torture", "assault", "stab", "shoot", "bomb", "explode",
-        "massacre", "slaughter",
-    ]
-}
-
-fn violence_keywords_medium() -> &'static [&'static str] {
-    &["fight", "hurt", "harm", "attack", "punch", "beat", "hit", "wound"]
-}
-
-fn hate_keywords_high() -> &'static [&'static str] {
-    &[
-        "subhuman", "vermin", "parasite",
-        "exterminate",
-        "inferior race",
-    ]
-}
-
-fn hate_keywords_medium() -> &'static [&'static str] {
-    &["hate", "despise", "bigot", "racist", "slur"]
-}
-
-fn sexual_keywords_high() -> &'static [&'static str] {
-    &["explicit sexual", "pornographic", "obscene"]
-}
-
-fn sexual_keywords_medium() -> &'static [&'static str] {
-    &["explicit", "sexual content", "nude", "adult content"]
-}
-
-fn self_harm_keywords_high() -> &'static [&'static str] {
-    &[
-        "suicide method",
-        "how to kill myself",
-        "how to end my life",
-        "overdose on pills",
-        "slit wrist",
-    ]
-}
-
-fn self_harm_keywords_medium() -> &'static [&'static str] {
-    &["self harm", "self-harm", "cutting myself", "hurt myself", "want to die"]
-}
+/// Lazily-initialized table of built-in keyword checks, shared across all
+/// `ContentFilter` instances.
+///
+/// Each entry is `(category, keywords, severity)`.  The table is built once and
+/// reused for every `check()` call, avoiding per-call slice re-allocation.
+static BUILTIN_KEYWORD_CHECKS: Lazy<Vec<(FilterCategory, Vec<&'static str>, FilterSeverity)>> =
+    Lazy::new(|| {
+        vec![
+            (
+                FilterCategory::Violence,
+                vec!["kill", "murder", "torture", "assault", "stab", "shoot", "bomb", "explode", "massacre", "slaughter"],
+                FilterSeverity::High,
+            ),
+            (
+                FilterCategory::Violence,
+                vec!["fight", "hurt", "harm", "attack", "punch", "beat", "hit", "wound"],
+                FilterSeverity::Medium,
+            ),
+            (
+                FilterCategory::Hate,
+                vec!["subhuman", "vermin", "parasite", "exterminate", "inferior race"],
+                FilterSeverity::High,
+            ),
+            (
+                FilterCategory::Hate,
+                vec!["hate", "despise", "bigot", "racist", "slur"],
+                FilterSeverity::Medium,
+            ),
+            (
+                FilterCategory::Sexual,
+                vec!["explicit sexual", "pornographic", "obscene"],
+                FilterSeverity::High,
+            ),
+            (
+                FilterCategory::Sexual,
+                vec!["explicit", "sexual content", "nude", "adult content"],
+                FilterSeverity::Medium,
+            ),
+            (
+                FilterCategory::SelfHarm,
+                vec!["suicide method", "how to kill myself", "how to end my life", "overdose on pills", "slit wrist"],
+                FilterSeverity::High,
+            ),
+            (
+                FilterCategory::SelfHarm,
+                vec!["self harm", "self-harm", "cutting myself", "hurt myself", "want to die"],
+                FilterSeverity::Medium,
+            ),
+        ]
+    });
 
 // ── Custom regex rule ──────────────────────────────────────────────────────────
 
@@ -259,19 +266,8 @@ impl ContentFilter {
     pub fn check(&self, text: &str) -> FilterResult {
         let lower = text.to_lowercase();
 
-        // Check built-in category keywords first.
-        let categories: &[(FilterCategory, &[&str], FilterSeverity)] = &[
-            (FilterCategory::Violence, violence_keywords_high(), FilterSeverity::High),
-            (FilterCategory::Violence, violence_keywords_medium(), FilterSeverity::Medium),
-            (FilterCategory::Hate, hate_keywords_high(), FilterSeverity::High),
-            (FilterCategory::Hate, hate_keywords_medium(), FilterSeverity::Medium),
-            (FilterCategory::Sexual, sexual_keywords_high(), FilterSeverity::High),
-            (FilterCategory::Sexual, sexual_keywords_medium(), FilterSeverity::Medium),
-            (FilterCategory::SelfHarm, self_harm_keywords_high(), FilterSeverity::High),
-            (FilterCategory::SelfHarm, self_harm_keywords_medium(), FilterSeverity::Medium),
-        ];
-
-        for (category, keywords, severity) in categories {
+        // Check built-in category keywords (Lazy static — allocated once).
+        for (category, keywords, severity) in BUILTIN_KEYWORD_CHECKS.iter() {
             if keywords.iter().any(|kw| lower.contains(kw)) {
                 if let Some(action) = self.action_for(*category, *severity) {
                     return FilterResult::from_action(action, *category, *severity);

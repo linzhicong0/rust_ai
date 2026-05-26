@@ -603,16 +603,16 @@ impl RegexPiiDetector {
 
     /// Replaces all PII pattern matches with a deterministic hash token.
     ///
-    /// Uses an FNV-1a-inspired 64-bit hash of each matched string, rendered
-    /// as the first 8 hexadecimal digits.  The same PII value always maps to
-    /// the same token, enabling correlation without exposing the original value.
+    /// Uses an FNV-1a-inspired 32-bit hash of each matched string, rendered
+    /// as 8 hexadecimal digits.  The same PII value always maps to the same
+    /// token, enabling correlation without exposing the original value.
     fn hash_pii(&self, text: &str) -> String {
         let mut result = text.to_string();
         for (regex, _, name) in &self.patterns {
             result = regex
                 .replace_all(&result, |caps: &regex::Captures| {
                     let matched = &caps[0];
-                    let token = fnv1a_hash8(matched);
+                    let token = fnv1a_hash32(matched);
                     format!("[{}_{:08x}]", name.to_uppercase(), token)
                 })
                 .to_string();
@@ -621,8 +621,10 @@ impl RegexPiiDetector {
     }
 }
 
-/// Compute an 8-character (32-bit) FNV-1a hash of a string.
-fn fnv1a_hash8(s: &str) -> u32 {
+/// Compute a 32-bit FNV-1a hash of a string.
+///
+/// Returns a `u32` rendered as 8 hexadecimal characters in token labels.
+fn fnv1a_hash32(s: &str) -> u32 {
     const OFFSET: u32 = 2_166_136_261;
     const PRIME: u32 = 16_777_619;
     let mut hash = OFFSET;
