@@ -340,7 +340,10 @@ mod tests {
         assert!(dequeued.is_some());
         let dequeued = dequeued.unwrap();
         assert_eq!(dequeued.id, task_id);
-        assert_eq!(queue.status(&task_id).await.unwrap(), TaskStatus::InProgress);
+        assert_eq!(
+            queue.status(&task_id).await.unwrap(),
+            TaskStatus::InProgress
+        );
         assert_eq!(queue.queue_length().await.unwrap(), 0);
     }
 
@@ -356,13 +359,25 @@ mod tests {
         queue.enqueue(high).await.unwrap();
         queue.enqueue(medium).await.unwrap();
 
-        let first = queue.dequeue(Duration::from_secs(1)).await.unwrap().unwrap();
+        let first = queue
+            .dequeue(Duration::from_secs(1))
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(first.priority, 10);
 
-        let second = queue.dequeue(Duration::from_secs(1)).await.unwrap().unwrap();
+        let second = queue
+            .dequeue(Duration::from_secs(1))
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(second.priority, 5);
 
-        let third = queue.dequeue(Duration::from_secs(1)).await.unwrap().unwrap();
+        let third = queue
+            .dequeue(Duration::from_secs(1))
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(third.priority, 1);
     }
 

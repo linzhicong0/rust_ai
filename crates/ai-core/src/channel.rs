@@ -135,7 +135,11 @@ pub trait Channel: Send + Sync {
     fn platform(&self) -> PlatformType;
 
     /// Send a message to a recipient.
-    async fn send(&self, message: ChannelMessage, options: SendOptions) -> Result<String, ChannelError>;
+    async fn send(
+        &self,
+        message: ChannelMessage,
+        options: SendOptions,
+    ) -> Result<String, ChannelError>;
 
     /// Receive messages (poll-based). Returns new messages since the given cursor.
     async fn receive(&self, cursor: Option<&str>) -> Result<Vec<ChannelMessage>, ChannelError>;
@@ -166,7 +170,11 @@ impl Channel for InMemoryChannel {
         self.platform
     }
 
-    async fn send(&self, message: ChannelMessage, _options: SendOptions) -> Result<String, ChannelError> {
+    async fn send(
+        &self,
+        message: ChannelMessage,
+        _options: SendOptions,
+    ) -> Result<String, ChannelError> {
         if message.recipient.is_empty() {
             return Err(ChannelError::InvalidRecipient(
                 "Recipient cannot be empty".to_string(),
@@ -241,8 +249,13 @@ mod tests {
             url: "https://example.com/report.pdf".to_string(),
             size: Some(1024),
         };
-        let msg = ChannelMessage::new("bot", "user@example.com", "See attached", PlatformType::Email)
-            .with_attachment(attachment);
+        let msg = ChannelMessage::new(
+            "bot",
+            "user@example.com",
+            "See attached",
+            PlatformType::Email,
+        )
+        .with_attachment(attachment);
         assert_eq!(msg.attachments.len(), 1);
         assert_eq!(msg.attachments[0].name, "report.pdf");
     }
@@ -267,7 +280,10 @@ mod tests {
         let msg = ChannelMessage::new("bot", "", "Hello!", PlatformType::Discord);
         let result = channel.send(msg, SendOptions::default()).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ChannelError::InvalidRecipient(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            ChannelError::InvalidRecipient(_)
+        ));
     }
 
     #[tokio::test]
@@ -301,7 +317,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_normalize_message() {
-        let msg = ChannelMessage::new("  BOT  ", "#General", "  Hello World  ", PlatformType::Slack);
+        let msg = ChannelMessage::new(
+            "  BOT  ",
+            "#General",
+            "  Hello World  ",
+            PlatformType::Slack,
+        );
         let normalized = normalize_message(msg);
         assert_eq!(normalized.body, "Hello World");
         assert_eq!(normalized.sender, "bot");

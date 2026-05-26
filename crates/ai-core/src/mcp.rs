@@ -100,7 +100,8 @@ pub struct McpServerCapabilities {
 #[async_trait]
 pub trait McpClient: Send + Sync {
     /// Connect to an MCP server.
-    async fn connect(&mut self, transport: McpTransport) -> Result<McpServerCapabilities, McpError>;
+    async fn connect(&mut self, transport: McpTransport)
+        -> Result<McpServerCapabilities, McpError>;
 
     /// List available tools on the connected server.
     async fn list_tools(&self) -> Result<Vec<McpToolDescriptor>, McpError>;
@@ -168,15 +169,13 @@ impl InMemoryMcpClient {
 
     /// Register a tool for testing.
     pub fn register_tool(&mut self, descriptor: McpToolDescriptor, result: McpToolResult) {
-        self.tool_results
-            .insert(descriptor.name.clone(), result);
+        self.tool_results.insert(descriptor.name.clone(), result);
         self.tools.push(descriptor);
     }
 
     /// Register a resource for testing.
     pub fn register_resource(&mut self, resource: McpResource, content: McpResourceContent) {
-        self.resource_contents
-            .insert(resource.uri.clone(), content);
+        self.resource_contents.insert(resource.uri.clone(), content);
         self.resources.push(resource);
     }
 }
@@ -189,7 +188,10 @@ impl Default for InMemoryMcpClient {
 
 #[async_trait]
 impl McpClient for InMemoryMcpClient {
-    async fn connect(&mut self, _transport: McpTransport) -> Result<McpServerCapabilities, McpError> {
+    async fn connect(
+        &mut self,
+        _transport: McpTransport,
+    ) -> Result<McpServerCapabilities, McpError> {
         self.connected = true;
         Ok(McpServerCapabilities {
             tools: !self.tools.is_empty(),
@@ -263,15 +265,13 @@ impl InMemoryMcpServer {
 
     /// Add a tool to the server.
     pub fn add_tool(&mut self, descriptor: McpToolDescriptor, result: McpToolResult) {
-        self.tool_handlers
-            .insert(descriptor.name.clone(), result);
+        self.tool_handlers.insert(descriptor.name.clone(), result);
         self.tools.push(descriptor);
     }
 
     /// Add a resource to the server.
     pub fn add_resource(&mut self, resource: McpResource, content: McpResourceContent) {
-        self.resource_contents
-            .insert(resource.uri.clone(), content);
+        self.resource_contents.insert(resource.uri.clone(), content);
         self.resources.push(resource);
     }
 }
@@ -377,9 +377,7 @@ mod tests {
         let mut client = InMemoryMcpClient::new();
         client.connect(McpTransport::Stdio).await.unwrap();
 
-        let result = client
-            .call_tool("nonexistent", serde_json::json!({}))
-            .await;
+        let result = client.call_tool("nonexistent", serde_json::json!({})).await;
         assert!(matches!(result, Err(McpError::ToolNotFound(_))));
     }
 
@@ -414,10 +412,7 @@ mod tests {
         assert_eq!(resources.len(), 1);
         assert_eq!(resources[0].uri, "file:///config.json");
 
-        let content = client
-            .read_resource("file:///config.json")
-            .await
-            .unwrap();
+        let content = client.read_resource("file:///config.json").await.unwrap();
         assert_eq!(content.text.unwrap(), r#"{"key": "value"}"#);
     }
 

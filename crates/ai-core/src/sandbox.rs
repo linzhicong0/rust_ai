@@ -81,8 +81,8 @@ impl Default for ResourceLimits {
         Self {
             timeout: Duration::from_secs(30),
             max_memory_bytes: 256 * 1024 * 1024, // 256 MB
-            max_cpu_ms: 10_000,                   // 10 seconds
-            max_output_bytes: 1024 * 1024,        // 1 MB
+            max_cpu_ms: 10_000,                  // 10 seconds
+            max_output_bytes: 1024 * 1024,       // 1 MB
             max_open_files: 64,
             max_processes: 10,
         }
@@ -95,8 +95,8 @@ impl ResourceLimits {
         Self {
             timeout: Duration::from_secs(5),
             max_memory_bytes: 64 * 1024 * 1024, // 64 MB
-            max_cpu_ms: 2_000,                   // 2 seconds
-            max_output_bytes: 256 * 1024,        // 256 KB
+            max_cpu_ms: 2_000,                  // 2 seconds
+            max_output_bytes: 256 * 1024,       // 256 KB
             max_open_files: 8,
             max_processes: 1,
         }
@@ -107,8 +107,8 @@ impl ResourceLimits {
         Self {
             timeout: Duration::from_secs(300),
             max_memory_bytes: 2 * 1024 * 1024 * 1024, // 2 GB
-            max_cpu_ms: 120_000,                       // 2 minutes
-            max_output_bytes: 10 * 1024 * 1024,        // 10 MB
+            max_cpu_ms: 120_000,                      // 2 minutes
+            max_output_bytes: 10 * 1024 * 1024,       // 10 MB
             max_open_files: 1024,
             max_processes: 64,
         }
@@ -321,9 +321,10 @@ impl SandboxExecutor for InMemorySandboxExecutor {
         config: &SandboxConfig,
     ) -> Result<SandboxExecutionResult, SandboxError> {
         if !self.available {
-            return Err(SandboxError::BackendNotAvailable(
-                format!("{:?}", config.backend),
-            ));
+            return Err(SandboxError::BackendNotAvailable(format!(
+                "{:?}",
+                config.backend
+            )));
         }
 
         // Simulate timeout check
@@ -406,8 +407,7 @@ mod tests {
 
     #[test]
     fn test_sandbox_config_path_no_permission() {
-        let config = SandboxConfig::new(SandboxBackend::Docker)
-            .allow_path("/tmp");
+        let config = SandboxConfig::new(SandboxBackend::Docker).allow_path("/tmp");
         // No FileRead permission, so even allowed paths are denied
         assert!(!config.is_path_allowed("/tmp/test.txt"));
     }
@@ -492,8 +492,7 @@ mod tests {
     #[tokio::test]
     async fn test_sandbox_executor_check_permissions() {
         let executor = InMemorySandboxExecutor::new();
-        let config = SandboxConfig::new(SandboxBackend::Wasm)
-            .grant(SandboxPermission::FileRead);
+        let config = SandboxConfig::new(SandboxBackend::Wasm).grant(SandboxPermission::FileRead);
 
         // Allowed
         let result = executor.check_permissions(&[SandboxPermission::FileRead], &config);
@@ -513,7 +512,10 @@ mod tests {
         // Large code should exceed memory
         let large_code = "x".repeat(100);
         let result = executor.execute(&large_code, &config).await;
-        assert!(matches!(result, Err(SandboxError::ResourceLimitExceeded(_))));
+        assert!(matches!(
+            result,
+            Err(SandboxError::ResourceLimitExceeded(_))
+        ));
     }
 
     #[test]

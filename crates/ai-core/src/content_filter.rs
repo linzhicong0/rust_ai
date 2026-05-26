@@ -103,17 +103,36 @@ static BUILTIN_KEYWORD_CHECKS: Lazy<Vec<(FilterCategory, Vec<&'static str>, Filt
         vec![
             (
                 FilterCategory::Violence,
-                vec!["kill", "murder", "torture", "assault", "stab", "shoot", "bomb", "explode", "massacre", "slaughter"],
+                vec![
+                    "kill",
+                    "murder",
+                    "torture",
+                    "assault",
+                    "stab",
+                    "shoot",
+                    "bomb",
+                    "explode",
+                    "massacre",
+                    "slaughter",
+                ],
                 FilterSeverity::High,
             ),
             (
                 FilterCategory::Violence,
-                vec!["fight", "hurt", "harm", "attack", "punch", "beat", "hit", "wound"],
+                vec![
+                    "fight", "hurt", "harm", "attack", "punch", "beat", "hit", "wound",
+                ],
                 FilterSeverity::Medium,
             ),
             (
                 FilterCategory::Hate,
-                vec!["subhuman", "vermin", "parasite", "exterminate", "inferior race"],
+                vec![
+                    "subhuman",
+                    "vermin",
+                    "parasite",
+                    "exterminate",
+                    "inferior race",
+                ],
                 FilterSeverity::High,
             ),
             (
@@ -133,12 +152,24 @@ static BUILTIN_KEYWORD_CHECKS: Lazy<Vec<(FilterCategory, Vec<&'static str>, Filt
             ),
             (
                 FilterCategory::SelfHarm,
-                vec!["suicide method", "how to kill myself", "how to end my life", "overdose on pills", "slit wrist"],
+                vec![
+                    "suicide method",
+                    "how to kill myself",
+                    "how to end my life",
+                    "overdose on pills",
+                    "slit wrist",
+                ],
                 FilterSeverity::High,
             ),
             (
                 FilterCategory::SelfHarm,
-                vec!["self harm", "self-harm", "cutting myself", "hurt myself", "want to die"],
+                vec![
+                    "self harm",
+                    "self-harm",
+                    "cutting myself",
+                    "hurt myself",
+                    "want to die",
+                ],
                 FilterSeverity::Medium,
             ),
         ]
@@ -291,7 +322,11 @@ impl ContentFilter {
     }
 
     /// Find the first rule that applies to `category` at `severity`.
-    fn action_for(&self, category: FilterCategory, severity: FilterSeverity) -> Option<FilterAction> {
+    fn action_for(
+        &self,
+        category: FilterCategory,
+        severity: FilterSeverity,
+    ) -> Option<FilterAction> {
         self.rules
             .iter()
             .find(|r| r.category == category && severity >= r.min_severity)
@@ -308,8 +343,11 @@ mod tests {
     // REQ-13.2: violence content is blocked when rule is configured
     #[test]
     fn test_violence_keyword_triggers_block() {
-        let filter = ContentFilter::new()
-            .with_rule(FilterCategory::Violence, FilterSeverity::High, FilterAction::Block("Violence detected".to_string()));
+        let filter = ContentFilter::new().with_rule(
+            FilterCategory::Violence,
+            FilterSeverity::High,
+            FilterAction::Block("Violence detected".to_string()),
+        );
 
         let result = filter.check("I will kill everyone here");
         assert_eq!(
@@ -323,8 +361,11 @@ mod tests {
     // REQ-13.2: hate speech at high severity is blocked
     #[test]
     fn test_hate_speech_high_severity_blocked() {
-        let filter = ContentFilter::new()
-            .with_rule(FilterCategory::Hate, FilterSeverity::High, FilterAction::Block("Hate detected".to_string()));
+        let filter = ContentFilter::new().with_rule(
+            FilterCategory::Hate,
+            FilterSeverity::High,
+            FilterAction::Block("Hate detected".to_string()),
+        );
 
         let result = filter.check("they are subhuman vermin");
         assert!(matches!(result.action, FilterAction::Block(_)));
@@ -334,8 +375,11 @@ mod tests {
     // REQ-13.2: self-harm content triggers block
     #[test]
     fn test_self_harm_content_blocked() {
-        let filter = ContentFilter::new()
-            .with_rule(FilterCategory::SelfHarm, FilterSeverity::Medium, FilterAction::Block("Self-harm detected".to_string()));
+        let filter = ContentFilter::new().with_rule(
+            FilterCategory::SelfHarm,
+            FilterSeverity::Medium,
+            FilterAction::Block("Self-harm detected".to_string()),
+        );
 
         let result = filter.check("I want to hurt myself and engage in self harm");
         assert!(matches!(result.action, FilterAction::Block(_)));
@@ -345,8 +389,11 @@ mod tests {
     // REQ-13.2: medium severity triggers warn when configured
     #[test]
     fn test_medium_severity_triggers_warn() {
-        let filter = ContentFilter::new()
-            .with_rule(FilterCategory::Violence, FilterSeverity::Medium, FilterAction::Warn("Violence warning".to_string()));
+        let filter = ContentFilter::new().with_rule(
+            FilterCategory::Violence,
+            FilterSeverity::Medium,
+            FilterAction::Warn("Violence warning".to_string()),
+        );
 
         let result = filter.check("they got into a fight last night");
         assert!(matches!(result.action, FilterAction::Warn(_)));
@@ -356,8 +403,11 @@ mod tests {
     // REQ-13.2: benign content is allowed when no rule matches
     #[test]
     fn test_benign_content_is_allowed() {
-        let filter = ContentFilter::new()
-            .with_rule(FilterCategory::Violence, FilterSeverity::High, FilterAction::Block("Violence".to_string()));
+        let filter = ContentFilter::new().with_rule(
+            FilterCategory::Violence,
+            FilterSeverity::High,
+            FilterAction::Block("Violence".to_string()),
+        );
 
         let result = filter.check("The weather is nice today.");
         assert_eq!(result.action, FilterAction::Allow);
@@ -368,8 +418,11 @@ mod tests {
     #[test]
     fn test_low_severity_below_threshold_is_allowed() {
         // Only block HIGH severity; medium keyword should pass through
-        let filter = ContentFilter::new()
-            .with_rule(FilterCategory::Violence, FilterSeverity::High, FilterAction::Block("Violence".to_string()));
+        let filter = ContentFilter::new().with_rule(
+            FilterCategory::Violence,
+            FilterSeverity::High,
+            FilterAction::Block("Violence".to_string()),
+        );
 
         // "fight" is a medium-severity keyword; HIGH threshold should allow it
         let result = filter.check("they got into a fight");
@@ -380,8 +433,17 @@ mod tests {
     #[test]
     fn test_custom_regex_rule_triggers_block() {
         let filter = ContentFilter::new()
-            .with_rule(FilterCategory::Custom, FilterSeverity::Medium, FilterAction::Block("Custom rule matched".to_string()))
-            .with_regex_rule(r"\bforbidden_word\b", FilterCategory::Custom, FilterSeverity::Medium, "custom policy violation");
+            .with_rule(
+                FilterCategory::Custom,
+                FilterSeverity::Medium,
+                FilterAction::Block("Custom rule matched".to_string()),
+            )
+            .with_regex_rule(
+                r"\bforbidden_word\b",
+                FilterCategory::Custom,
+                FilterSeverity::Medium,
+                "custom policy violation",
+            );
 
         let result = filter.check("This message contains forbidden_word inside it.");
         assert!(matches!(result.action, FilterAction::Block(_)));
@@ -394,7 +456,12 @@ mod tests {
     fn test_custom_regex_rule_with_no_category_rule_allows() {
         let filter = ContentFilter::new()
             // No rule for FilterCategory::Custom is registered
-            .with_regex_rule(r"\bforbidden_word\b", FilterCategory::Custom, FilterSeverity::High, "custom");
+            .with_regex_rule(
+                r"\bforbidden_word\b",
+                FilterCategory::Custom,
+                FilterSeverity::High,
+                "custom",
+            );
 
         let result = filter.check("This contains forbidden_word.");
         assert_eq!(result.action, FilterAction::Allow);
@@ -403,8 +470,11 @@ mod tests {
     // REQ-13.2: sexual content at high severity blocked
     #[test]
     fn test_sexual_content_high_severity_blocked() {
-        let filter = ContentFilter::new()
-            .with_rule(FilterCategory::Sexual, FilterSeverity::High, FilterAction::Block("Sexual content".to_string()));
+        let filter = ContentFilter::new().with_rule(
+            FilterCategory::Sexual,
+            FilterSeverity::High,
+            FilterAction::Block("Sexual content".to_string()),
+        );
 
         let result = filter.check("This is explicit sexual content");
         assert!(matches!(result.action, FilterAction::Block(_)));
@@ -414,8 +484,11 @@ mod tests {
     // REQ-13.2: filter result contains reason
     #[test]
     fn test_filter_result_contains_reason() {
-        let filter = ContentFilter::new()
-            .with_rule(FilterCategory::Violence, FilterSeverity::High, FilterAction::Block("Violence".to_string()));
+        let filter = ContentFilter::new().with_rule(
+            FilterCategory::Violence,
+            FilterSeverity::High,
+            FilterAction::Block("Violence".to_string()),
+        );
 
         let result = filter.check("I will murder everyone");
         assert!(result.reason.is_some());
@@ -426,14 +499,19 @@ mod tests {
     #[test]
     fn test_first_matching_rule_wins() {
         let filter = ContentFilter::new()
-            .with_rule(FilterCategory::Violence, FilterSeverity::High, FilterAction::Block("First rule".to_string()))
-            .with_rule(FilterCategory::Violence, FilterSeverity::High, FilterAction::Warn("Second rule".to_string()));
+            .with_rule(
+                FilterCategory::Violence,
+                FilterSeverity::High,
+                FilterAction::Block("First rule".to_string()),
+            )
+            .with_rule(
+                FilterCategory::Violence,
+                FilterSeverity::High,
+                FilterAction::Warn("Second rule".to_string()),
+            );
 
         let result = filter.check("I will kill you");
         // First rule should win
-        assert_eq!(
-            result.action,
-            FilterAction::Block("First rule".to_string())
-        );
+        assert_eq!(result.action, FilterAction::Block("First rule".to_string()));
     }
 }

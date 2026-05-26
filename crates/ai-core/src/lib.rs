@@ -139,6 +139,13 @@ pub use crate::audio::{
     TranscribeConfig, Transcriber, TranscriptResult, TranscriptSegment, Voice, VoiceGender,
 };
 
+// Re-export video understanding (REQ-8.4)
+pub use crate::video::{
+    DefaultVideoAnalyzer, FrameExtractionConfig, FrameExtractor, FrameFormat,
+    InMemoryFrameExtractor, SceneBoundary, SceneDescription, SceneDetector, TemporalContext,
+    VideoAnalysisResult, VideoAnalyzer, VideoError, VideoFrame,
+};
+
 // Re-export benchmarking (REQ-10.1)
 pub use crate::benchmark::{
     BenchmarkConfig, BenchmarkError, BenchmarkMetrics, BenchmarkRun, BenchmarkRunner, CaseResult,
@@ -169,7 +176,9 @@ pub use crate::prompt_registry::{
 };
 
 // Re-export content filtering (REQ-13.2)
-pub use crate::content_filter::{ContentFilter, FilterAction, FilterCategory, FilterResult, FilterSeverity};
+pub use crate::content_filter::{
+    ContentFilter, FilterAction, FilterCategory, FilterResult, FilterSeverity,
+};
 
 // Re-export horizontal scaling (REQ-14.2)
 pub use crate::scaling::{
@@ -184,8 +193,8 @@ pub use crate::data_source::{
 
 // Re-export communication platforms (REQ-17.2)
 pub use crate::channel::{
-    Attachment, Channel, ChannelError, ChannelMessage, InMemoryChannel, PlatformType, SendOptions,
-    normalize_message,
+    normalize_message, Attachment, Channel, ChannelError, ChannelMessage, InMemoryChannel,
+    PlatformType, SendOptions,
 };
 
 // Re-export MCP support (REQ-17.3)
@@ -196,7 +205,7 @@ pub use crate::mcp::{
 
 // Re-export model routing (REQ-18.1)
 pub use crate::model_routing::{
-    ComplexityRouter, RoutingContext, RoutingDecision, RoutingError, RoutingRule, Router,
+    ComplexityRouter, Router, RoutingContext, RoutingDecision, RoutingError, RoutingRule,
     RuleBasedRouter, TaskComplexity,
 };
 
@@ -224,11 +233,6 @@ pub mod ab_testing;
 pub mod audio;
 pub mod benchmark;
 pub mod channel;
-pub mod embedding;
-pub mod mcp;
-pub mod model_routing;
-pub mod sandbox;
-pub mod token_optimization;
 pub mod client;
 pub mod config;
 pub mod content_filter;
@@ -236,12 +240,15 @@ pub mod context;
 pub mod cost;
 pub mod data_source;
 pub mod embedder;
+pub mod embedding;
 pub mod error;
 pub mod guardrail;
 pub mod hot_reload;
 pub mod image_gen;
+pub mod mcp;
 pub mod memory;
 pub mod model_registry;
+pub mod model_routing;
 pub mod output_format;
 pub mod plugin;
 pub mod prompt_cache;
@@ -250,16 +257,19 @@ pub mod prompt_registry;
 pub mod provider;
 pub mod rate_limit;
 pub mod regression;
+pub mod sandbox;
 pub mod scaling;
 pub mod scorer;
 pub mod structured;
 pub mod structured_data;
 pub mod system_prompt;
 pub mod template;
+pub mod token_optimization;
 pub mod tool;
 pub mod tool_compose;
 pub mod typed;
 pub mod types;
+pub mod video;
 
 // Prelude module for common imports
 pub mod prelude {

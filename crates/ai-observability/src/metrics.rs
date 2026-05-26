@@ -381,15 +381,22 @@ impl MetricsRegistry {
     pub fn render_prometheus(&self) -> String {
         let inner = self.inner.lock().unwrap();
         let mut out = String::new();
+        out.push_str(&inner.latency.render(
+            "ai_request_latency_seconds",
+            "LLM request latency in seconds",
+        ));
+        out.push('\n');
         out.push_str(
             &inner
-                .latency
-                .render("ai_request_latency_seconds", "LLM request latency in seconds"),
+                .tokens
+                .render("ai_tokens_total", "Total tokens processed"),
         );
         out.push('\n');
-        out.push_str(&inner.tokens.render("ai_tokens_total", "Total tokens processed"));
-        out.push('\n');
-        out.push_str(&inner.errors.render("ai_errors_total", "Total errors encountered"));
+        out.push_str(
+            &inner
+                .errors
+                .render("ai_errors_total", "Total errors encountered"),
+        );
         out.push('\n');
         out.push_str(
             &inner
