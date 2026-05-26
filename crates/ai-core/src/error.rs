@@ -139,6 +139,26 @@ pub enum GuardrailError {
     Check(String),
 }
 
+/// Errors from quality scoring.
+#[derive(Debug, thiserror::Error)]
+pub enum ScorerError {
+    /// Invalid scorer configuration.
+    #[error("Invalid scorer configuration: {0}")]
+    Configuration(String),
+
+    /// Pipeline requires at least one scorer.
+    #[error("Scorer pipeline requires at least one scorer")]
+    EmptyPipeline,
+
+    /// A scorer returned a value outside the supported range.
+    #[error("Scorer '{scorer}' returned invalid score {score}; expected value in 0.0..=1.0")]
+    InvalidScore { scorer: String, score: f64 },
+
+    /// LLM judge or custom scorer execution failed.
+    #[error("Scorer execution failed: {0}")]
+    Execution(String),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
