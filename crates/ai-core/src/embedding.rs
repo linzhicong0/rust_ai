@@ -214,7 +214,11 @@ impl BatchEmbedder for InMemoryBatchEmbedder {
         *count += 1;
 
         let total_texts = texts.len();
-        let batches_processed = (total_texts + config.batch_size - 1) / config.batch_size;
+        let batches_processed = if total_texts == 0 {
+            0
+        } else {
+            (total_texts + config.batch_size - 1) / config.batch_size
+        };
 
         // Generate deterministic embeddings based on text content
         let embeddings: Vec<Vec<f32>> = texts
