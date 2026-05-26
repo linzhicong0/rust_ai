@@ -188,11 +188,47 @@ pub use crate::channel::{
     normalize_message,
 };
 
+// Re-export MCP support (REQ-17.3)
+pub use crate::mcp::{
+    InMemoryMcpClient, InMemoryMcpServer, McpClient, McpError, McpResource, McpResourceContent,
+    McpServer, McpServerCapabilities, McpToolDescriptor, McpToolResult, McpTransport,
+};
+
+// Re-export model routing (REQ-18.1)
+pub use crate::model_routing::{
+    ComplexityRouter, RoutingContext, RoutingDecision, RoutingError, RoutingRule, Router,
+    RuleBasedRouter, TaskComplexity,
+};
+
+// Re-export token optimization (REQ-18.2)
+pub use crate::token_optimization::{
+    compress_prompt, enforce_response_limit, estimate_tokens as estimate_token_count,
+    prune_context, OptimizationResult, ScoredContextEntry, TokenOptimizationConfig,
+    TokenOptimizationError, TokenOptimizer,
+};
+
+// Re-export embedding generation (REQ-1.5)
+pub use crate::embedding::{
+    BatchEmbedder, BatchEmbeddingConfig, BatchEmbeddingResult, EmbeddingManager,
+    EmbeddingModelInfo, InMemoryBatchEmbedder,
+};
+
+// Re-export sandboxed execution (REQ-3.6)
+pub use crate::sandbox::{
+    InMemorySandboxExecutor, ResourceLimits, SandboxBackend, SandboxConfig, SandboxError,
+    SandboxExecutionResult, SandboxExecutor, SandboxPermission,
+};
+
 // Module declarations
 pub mod ab_testing;
 pub mod audio;
 pub mod benchmark;
 pub mod channel;
+pub mod embedding;
+pub mod mcp;
+pub mod model_routing;
+pub mod sandbox;
+pub mod token_optimization;
 pub mod client;
 pub mod config;
 pub mod content_filter;
