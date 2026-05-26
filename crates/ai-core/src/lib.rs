@@ -112,6 +112,12 @@ pub use crate::prompt_cache::{
     CacheMarker, CacheMetadata, CacheableContent, CachingProvider, PromptCacheConfig,
 };
 
+// Re-export connection pooling (REQ-12.5)
+pub use crate::connection_pool::{
+    ConnectionPoolConfig, ConnectionPoolError, ConnectionPoolManager, PoolStats,
+    ProviderConnectionPool,
+};
+
 // Re-export hot reload (REQ-15.5)
 pub use crate::hot_reload::{ConfigRegistry, FileWatcherConfig, HotReloadError, HotReloadable};
 
@@ -235,6 +241,7 @@ pub mod benchmark;
 pub mod channel;
 pub mod client;
 pub mod config;
+pub mod connection_pool;
 pub mod content_filter;
 pub mod context;
 pub mod cost;
