@@ -321,7 +321,7 @@ impl PromptInjectionDefender {
     // Pattern builders
     fn build_ignore_patterns() -> Vec<Regex> {
         vec![
-            Regex::new(r"(?i)(ignore|forget|disregard)\s+(all\s+)?(previous\s+|the\s+|your\s+|my\s+)?(instructions?|commands?|directives?|rules?|constraints?)").unwrap(),
+            Regex::new(r"(?i)(ignore|forget|disregard)\s+(all\s+)?((previous|the|your|my)\s+)?(instructions?|commands?|directives?|rules?|constraints?)").unwrap(),
             Regex::new(r"(?i)(override|overwrite|replace)\s+(your|my|the)\s+(instructions?|programming|system|prompt)").unwrap(),
             Regex::new(r"(?i)(do\s+not\s+listen|pay\s+no\s+attention|don't\s+follow)\s+to").unwrap(),
             Regex::new(r"(?i)(new\s+role|new\s+instructions?|new\s+task|begin\s+anew)").unwrap(),
