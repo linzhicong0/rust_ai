@@ -419,9 +419,8 @@ mod tests {
     // REQ-16.4: Support Google Cloud Functions
     #[test]
     fn test_google_cloud_functions() {
-        let config =
-            ServerlessConfig::new("my-handler", ServerlessPlatform::GoogleCloudFunctions)
-                .with_memory_mb(256);
+        let config = ServerlessConfig::new("my-handler", ServerlessPlatform::GoogleCloudFunctions)
+            .with_memory_mb(256);
 
         let func = ServerlessFunction::new(config);
         assert_eq!(func.platform(), &ServerlessPlatform::GoogleCloudFunctions);

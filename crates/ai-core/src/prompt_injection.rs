@@ -321,7 +321,7 @@ impl PromptInjectionDefender {
     // Pattern builders
     fn build_ignore_patterns() -> Vec<Regex> {
         vec![
-            Regex::new(r"(?i)(ignore|forget|disregard)\s+(all|previous|the|your)\s+(instructions?|commands?|directives?|rules?|constraints?)").unwrap(),
+            Regex::new(r"(?i)(ignore|forget|disregard)\s+(all\s+)?((previous|the|your|my)\s+)?(instructions?|commands?|directives?|rules?|constraints?)").unwrap(),
             Regex::new(r"(?i)(override|overwrite|replace)\s+(your|my|the)\s+(instructions?|programming|system|prompt)").unwrap(),
             Regex::new(r"(?i)(do\s+not\s+listen|pay\s+no\s+attention|don't\s+follow)\s+to").unwrap(),
             Regex::new(r"(?i)(new\s+role|new\s+instructions?|new\s+task|begin\s+anew)").unwrap(),
@@ -331,7 +331,7 @@ impl PromptInjectionDefender {
 
     fn build_extraction_patterns() -> Vec<Regex> {
         vec![
-            Regex::new(r"(?i)(show|tell|reveal|display|output|print|write)\s+(me|us|them)\s+(your|the|my)\s+(instructions?|prompt|system\s+prompt|programming|rules?|guidelines?)").unwrap(),
+            Regex::new(r"(?i)(show|tell|reveal|display|output|print|write)\s+((me|us|them)\s+)?(your|the|my)\s+(instructions?|prompt|system\s+prompt|programming|rules?|guidelines?)").unwrap(),
             Regex::new(r"(?i)(what\s+are|what\s+is)\s+(your|the)\s+(instructions?|prompt|system\s+prompt|programming|guidelines?)").unwrap(),
             Regex::new(r"(?i)(repeat|echo|copy|quote)\s+(back|your|the)\s+(instructions?|prompt|system\s+prompt)").unwrap(),
             Regex::new(r"(?i)(dump|leak|expose|share)\s+(your|the)\s+(prompt|instructions?|system\s+prompt)").unwrap(),
@@ -343,8 +343,8 @@ impl PromptInjectionDefender {
     fn build_role_patterns() -> Vec<Regex> {
         vec![
             Regex::new(r"(?i)(you\s+are\s+no\s+longer|you're\s+not|you\s+aren't)\s+(a|an|the)\s+(.{1,30})\s+(assistant|ai|model|bot)").unwrap(),
-            Regex::new(r"(?i)(act\s+as|pretend\s+to\s+be|roleplay\s+as|become)\s+(a|an|the)\s+(.{1,100})(?=\.|,|and|then)").unwrap(),
-            Regex::new(r"(?i)(switch\s+to|change\s+to|transform\s+into)\s+(a|an|the)\s+(.{1,100})(?=\.|,|and|then)").unwrap(),
+            Regex::new(r"(?i)(act\s+as|pretend\s+to\s+be|roleplay\s+as|become)\s+(a|an|the)\s+\S+").unwrap(),
+            Regex::new(r"(?i)(switch\s+to|change\s+to|transform\s+into)\s+(a|an|the)\s+\S+").unwrap(),
             Regex::new(r"(?i)(from\s+now\s+on|starting\s+now|beginning\s+now)(.{0,100})?(you\s+are|act\s+as)").unwrap(),
         ]
     }
@@ -362,6 +362,7 @@ impl PromptInjectionDefender {
     fn build_encoding_patterns() -> Vec<Regex> {
         vec![
             Regex::new(r"(?i)(base64|hex|binary|rot13|ascii|unicode)\s+(encode|decode|convert|translate)").unwrap(),
+            Regex::new(r"(?i)(encode|decode|convert|translate).{0,30}(base64|hex|binary|rot13|ascii|unicode)").unwrap(),
             Regex::new(r"(?i)(reverse|backward|mirrored)\s+(text|string|characters?)").unwrap(),
             Regex::new(r"(?i)(using\s+)?(different|alternative|other)\s+(language|alphabet|script|writing\s+system)").unwrap(),
             Regex::new(r"(?i)(character\s+by\s+character|letter\s+by\s+letter|one\s+by\s+one)").unwrap(),

@@ -673,7 +673,10 @@ mod tests {
         // This should fail - would exceed limit
         let result = manager.record_spend("block-budget", 10.0);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), BudgetError::LimitExceeded { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            BudgetError::LimitExceeded { .. }
+        ));
     }
 
     // REQ-18.3: can_spend check
@@ -762,9 +765,7 @@ mod tests {
     fn test_reset_spending() {
         let mut manager = BudgetManager::new();
         manager
-            .create_budget(
-                Budget::new("reset-budget", BudgetScope::Global).with_limit(100.0),
-            )
+            .create_budget(Budget::new("reset-budget", BudgetScope::Global).with_limit(100.0))
             .unwrap();
 
         manager.record_spend("reset-budget", 75.0).unwrap();
@@ -789,8 +790,7 @@ mod tests {
         let mut manager = BudgetManager::new();
 
         // Empty ID
-        let result =
-            manager.create_budget(Budget::new("", BudgetScope::Global).with_limit(100.0));
+        let result = manager.create_budget(Budget::new("", BudgetScope::Global).with_limit(100.0));
         assert!(result.is_err());
 
         // Negative limit
@@ -821,14 +821,10 @@ mod tests {
     fn test_total_spending() {
         let mut manager = BudgetManager::new();
         manager
-            .create_budget(
-                Budget::new("b1", BudgetScope::Project("a".into())).with_limit(100.0),
-            )
+            .create_budget(Budget::new("b1", BudgetScope::Project("a".into())).with_limit(100.0))
             .unwrap();
         manager
-            .create_budget(
-                Budget::new("b2", BudgetScope::Project("b".into())).with_limit(200.0),
-            )
+            .create_budget(Budget::new("b2", BudgetScope::Project("b".into())).with_limit(200.0))
             .unwrap();
 
         manager.record_spend("b1", 30.0).unwrap();
@@ -842,9 +838,7 @@ mod tests {
     fn test_remove_budget() {
         let mut manager = BudgetManager::new();
         manager
-            .create_budget(
-                Budget::new("removable", BudgetScope::Global).with_limit(100.0),
-            )
+            .create_budget(Budget::new("removable", BudgetScope::Global).with_limit(100.0))
             .unwrap();
 
         assert!(manager.get_budget("removable").is_some());
@@ -860,10 +854,7 @@ mod tests {
             BudgetScope::Project("alpha".into()).description(),
             "project:alpha"
         );
-        assert_eq!(
-            BudgetScope::Agent("bot".into()).description(),
-            "agent:bot"
-        );
+        assert_eq!(BudgetScope::Agent("bot".into()).description(), "agent:bot");
         assert_eq!(
             BudgetScope::User("alice".into()).description(),
             "user:alice"

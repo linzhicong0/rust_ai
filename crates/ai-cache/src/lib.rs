@@ -5,6 +5,5 @@ pub use response::{
     CacheKeyBuilder, CachedProvider, ResponseCache, ResponseCacheConfig, ResponseCacheKeyBuilder,
 };
 pub use semantic::{
-    CacheStats, CachedEntry, EvictionPolicy, SemanticCache, SemanticCacheConfig,
-    SemanticCacheError,
+    CacheStats, CachedEntry, EvictionPolicy, SemanticCache, SemanticCacheConfig, SemanticCacheError,
 };

@@ -598,6 +598,7 @@ mod tests {
             ContentPart::Image {
                 url: "data:image/jpeg;base64,/9j/4AAQ".to_string(),
                 media_type: "image/jpeg".to_string(),
+                detail: None,
             },
         ];
 
@@ -626,6 +627,7 @@ mod tests {
             ContentPart::Image {
                 url: "https://example.com/image.jpg".to_string(),
                 media_type: "image/jpeg".to_string(),
+                detail: None,
             },
         ];
 
