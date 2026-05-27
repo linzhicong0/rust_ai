@@ -236,8 +236,7 @@ pub use crate::sandbox::{
 
 // Re-export access control (REQ-13.4)
 pub use crate::access_control::{
-    AccessControl, AccessControlError, AccessDecision, Permission, ResourceType,
-    Role as AccessRole,
+    AccessControl, AccessControlError, AccessDecision, Permission, ResourceType, Role as AccessRole,
 };
 
 // Re-export audit trail (REQ-13.5)

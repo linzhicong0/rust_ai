@@ -142,7 +142,7 @@ impl FrameworkConfig {
             // Use "__" to separate nested keys (e.g., AI_AGENT__MAX_ITERATIONS)
             .add_source(
                 config::Environment::with_prefix("AI")
-                    .prefix_separator("__")
+                    .prefix_separator("_")
                     .separator("__")
                     .try_parsing(true),
             )
@@ -177,7 +177,7 @@ impl FrameworkConfig {
             .add_source(config::File::from(path.as_ref()).required(false))
             .add_source(
                 config::Environment::with_prefix("AI")
-                    .prefix_separator("__")
+                    .prefix_separator("_")
                     .separator("__")
                     .try_parsing(true),
             )
@@ -414,6 +414,7 @@ impl Default for ServerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     // REQ-15.3: Configuration Tests
 
@@ -699,6 +700,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_config_env_variable_prefix() {
         // Test that AI_ prefix works for environment variables
         std::env::set_var("AI_DEFAULT_PROVIDER", "test-provider");
@@ -765,6 +767,7 @@ mod tests {
     // REQ-15.3: YAML/JSON file loading tests
 
     #[test]
+    #[serial]
     fn test_toml_file_overrides_defaults() {
         // Create a temporary TOML config file
         use std::io::Write;
@@ -808,6 +811,7 @@ logging_level = "info"
     }
 
     #[test]
+    #[serial]
     fn test_json_file_overrides_defaults() {
         use std::io::Write;
         use tempfile::NamedTempFile;
@@ -851,6 +855,7 @@ logging_level = "info"
     // REQ-15.3: Environment variable precedence tests
 
     #[test]
+    #[serial]
     fn test_env_var_precedence_over_file() {
         use std::io::Write;
         use tempfile::NamedTempFile;
@@ -895,6 +900,7 @@ logging_level = "info"
     }
 
     #[test]
+    #[serial]
     fn test_env_var_nested_config() {
         use std::io::Write;
         use tempfile::NamedTempFile;
@@ -939,6 +945,7 @@ logging_level = "info"
     // REQ-15.3: Full hierarchy chain test
 
     #[test]
+    #[serial]
     fn test_full_hierarchy_chain() {
         use std::io::Write;
         use tempfile::NamedTempFile;
@@ -1083,6 +1090,7 @@ invalid_toml_syntax = [
     }
 
     #[test]
+    #[serial]
     fn test_env_var_provider_config_override() {
         use std::io::Write;
         use tempfile::NamedTempFile;
@@ -1135,6 +1143,7 @@ base_url = "https://api.anthropic.com"
     }
 
     #[test]
+    #[serial]
     fn test_logging_level_env_override() {
         use std::io::Write;
         use tempfile::NamedTempFile;
@@ -1180,6 +1189,7 @@ logging_level = "error"
 
     // Simple test to verify env vars work
     #[test]
+    #[serial]
     fn test_env_var_simple() {
         std::env::set_var("AI_DEFAULT_PROVIDER", "test_provider");
 
@@ -1187,7 +1197,7 @@ logging_level = "error"
         let settings = config::Config::builder()
             .add_source(
                 config::Environment::with_prefix("AI")
-                    .prefix_separator("__")
+                    .prefix_separator("_")
                     .separator("__")
                     .try_parsing(true),
             )

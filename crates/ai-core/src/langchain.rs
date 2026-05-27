@@ -331,7 +331,10 @@ impl FrameworkChainAdapter {
                 }
                 ChainStepType::Conditional { condition_key } => {
                     let condition = self.context.get(condition_key).cloned().unwrap_or_default();
-                    format!("[Conditional:{}={}] {}", condition_key, condition, step_input)
+                    format!(
+                        "[Conditional:{}={}] {}",
+                        condition_key, condition, step_input
+                    )
                 }
             };
 
@@ -535,9 +538,7 @@ mod tests {
         let adapter = LangChainToolAdapter::new(lc_tool);
 
         // String input
-        let result = adapter
-            .execute_json(&serde_json::json!("hello"))
-            .unwrap();
+        let result = adapter.execute_json(&serde_json::json!("hello")).unwrap();
         assert_eq!(result, "Results for: hello");
 
         // Object with "input" field
@@ -555,7 +556,10 @@ mod tests {
 
         let result = adapter.execute("anything");
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), LangChainError::ToolExecution(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            LangChainError::ToolExecution(_)
+        ));
     }
 
     // REQ-17.4: Adapter - framework agent → LangChain chain
@@ -591,8 +595,7 @@ mod tests {
     // REQ-17.4: Chain validation
     #[test]
     fn test_chain_validation_empty_name() {
-        let chain = FrameworkChainAdapter::new("")
-            .with_step(ChainStep::llm("step1", "gpt-4"));
+        let chain = FrameworkChainAdapter::new("").with_step(ChainStep::llm("step1", "gpt-4"));
         assert!(chain.validate().is_err());
     }
 
@@ -606,8 +609,8 @@ mod tests {
     // REQ-17.4: Chain context management
     #[test]
     fn test_chain_context() {
-        let mut chain = FrameworkChainAdapter::new("ctx-chain")
-            .with_step(ChainStep::llm("step1", "gpt-4"));
+        let mut chain =
+            FrameworkChainAdapter::new("ctx-chain").with_step(ChainStep::llm("step1", "gpt-4"));
 
         chain.set_context("key1", "value1");
         chain.set_context("key2", "value2");

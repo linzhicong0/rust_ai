@@ -140,7 +140,12 @@ impl SemanticCache {
             .entries
             .iter()
             .enumerate()
-            .map(|(index, entry)| (index, cosine_similarity(&query_embedding, &entry.query_embedding)))
+            .map(|(index, entry)| {
+                (
+                    index,
+                    cosine_similarity(&query_embedding, &entry.query_embedding),
+                )
+            })
             .filter(|(_, similarity)| *similarity >= self.config.similarity_threshold)
             .max_by(|left, right| compare_similarity(left, right, &state.entries));
 
@@ -166,7 +171,11 @@ impl SemanticCache {
 
         self.prune_expired(&mut state, now);
 
-        if let Some(existing) = state.entries.iter_mut().find(|entry| entry.query_text == query) {
+        if let Some(existing) = state
+            .entries
+            .iter_mut()
+            .find(|entry| entry.query_text == query)
+        {
             existing.query_text = query.to_string();
             existing.query_embedding = query_embedding;
             existing.response = response;
@@ -208,7 +217,12 @@ impl SemanticCache {
             .entries
             .iter()
             .enumerate()
-            .map(|(index, entry)| (index, cosine_similarity(&query_embedding, &entry.query_embedding)))
+            .map(|(index, entry)| {
+                (
+                    index,
+                    cosine_similarity(&query_embedding, &entry.query_embedding),
+                )
+            })
             .max_by(|left, right| compare_similarity(left, right, &state.entries))
             .map(|(index, _)| index);
 
@@ -329,7 +343,11 @@ fn compare_similarity(
     left.1
         .partial_cmp(&right.1)
         .unwrap_or(Ordering::Equal)
-        .then_with(|| entries[left.0].last_accessed.cmp(&entries[right.0].last_accessed))
+        .then_with(|| {
+            entries[left.0]
+                .last_accessed
+                .cmp(&entries[right.0].last_accessed)
+        })
         .then_with(|| entries[left.0].hit_count.cmp(&entries[right.0].hit_count))
 }
 
@@ -376,7 +394,12 @@ mod tests {
         async fn embed(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>, EmbedderError> {
             Ok(texts
                 .into_iter()
-                .map(|text| self.embeddings.get(&text).cloned().unwrap_or_else(|| vec![0.0, 0.0]))
+                .map(|text| {
+                    self.embeddings
+                        .get(&text)
+                        .cloned()
+                        .unwrap_or_else(|| vec![0.0, 0.0])
+                })
                 .collect())
         }
 

@@ -638,6 +638,7 @@ mod tests {
             ContentPart::Image {
                 url: "https://example.com/image.jpg".to_string(),
                 media_type: "image/jpeg".to_string(),
+                detail: None,
             },
         ];
 
@@ -895,6 +896,7 @@ mod tests {
         let parts = vec![ContentPart::Image {
             url: "data:image/jpeg;base64,/9j/4AAQSkZJRg".to_string(),
             media_type: "image/jpeg".to_string(),
+            detail: None,
         }];
 
         let content = Content::MultiPart(parts);
