@@ -259,6 +259,24 @@ pub use crate::cloud_deployment::{
     DeploymentStatus, IaCFormat, ServiceIntegration,
 };
 
+// Re-export serverless support (REQ-16.4)
+pub use crate::serverless::{
+    ColdStartConfig, EventTrigger, FunctionStatus, ServerlessConfig, ServerlessError,
+    ServerlessFunction, ServerlessPlatform,
+};
+
+// Re-export LangChain compatibility (REQ-17.4)
+pub use crate::langchain::{
+    ChainStep, ChainStepType, FrameworkChainAdapter, LangChainError, LangChainTool,
+    LangChainToolAdapter, PythonBridgeConfig, ToolRegistry as LangChainToolRegistry,
+};
+
+// Re-export budget management (REQ-18.3)
+pub use crate::budget::{
+    AlertThreshold, Budget, BudgetError, BudgetManager, BudgetPeriod, BudgetScope, BudgetStatus,
+    LimitAction,
+};
+
 // Module declarations
 pub mod ab_testing;
 pub mod access_control;
@@ -266,6 +284,7 @@ pub mod audio;
 pub mod audit_trail;
 pub mod batch_processing;
 pub mod benchmark;
+pub mod budget;
 pub mod channel;
 pub mod client;
 pub mod cloud_deployment;
@@ -281,6 +300,7 @@ pub mod error;
 pub mod guardrail;
 pub mod hot_reload;
 pub mod image_gen;
+pub mod langchain;
 pub mod mcp;
 pub mod memory;
 pub mod model_registry;
@@ -297,6 +317,7 @@ pub mod resource_management;
 pub mod sandbox;
 pub mod scaling;
 pub mod scorer;
+pub mod serverless;
 pub mod structured;
 pub mod structured_data;
 pub mod system_prompt;
