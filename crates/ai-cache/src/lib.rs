@@ -4,3 +4,7 @@ pub mod semantic;
 pub use response::{
     CacheKeyBuilder, CachedProvider, ResponseCache, ResponseCacheConfig, ResponseCacheKeyBuilder,
 };
+pub use semantic::{
+    CacheStats, CachedEntry, EvictionPolicy, SemanticCache, SemanticCacheConfig,
+    SemanticCacheError,
+};

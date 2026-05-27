@@ -153,10 +153,7 @@ impl EmbeddingManager {
     }
 
     /// Generate embeddings using the default provider.
-    pub async fn embed(
-        &self,
-        texts: Vec<String>,
-    ) -> Result<BatchEmbeddingResult, EmbedderError> {
+    pub async fn embed(&self, texts: Vec<String>) -> Result<BatchEmbeddingResult, EmbedderError> {
         let provider_name = self
             .default_provider
             .as_ref()
@@ -321,10 +318,7 @@ mod tests {
         let provider = Arc::new(InMemoryBatchEmbedder::new(384, "model-a", "provider-a"));
         manager.register_provider("provider-a", provider);
 
-        let result = manager
-            .embed(vec!["test".to_string()])
-            .await
-            .unwrap();
+        let result = manager.embed(vec!["test".to_string()]).await.unwrap();
         assert_eq!(result.embeddings.len(), 1);
         assert_eq!(result.embeddings[0].len(), 384);
     }

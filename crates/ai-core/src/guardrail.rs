@@ -1366,8 +1366,8 @@ mod tests {
     /// REQ-13.3 acceptance: Hash action replaces PII with a hex token.
     #[tokio::test]
     async fn test_pii_hash_action_replaces_with_token() {
-        let detector = RegexPiiDetector::new()
-            .add_pattern(r"\b\d{3}-\d{2}-\d{4}\b", "ssn", PiiAction::Hash);
+        let detector =
+            RegexPiiDetector::new().add_pattern(r"\b\d{3}-\d{2}-\d{4}\b", "ssn", PiiAction::Hash);
 
         let result = detector
             .check_input("My SSN is 123-45-6789 and it is private")
@@ -1376,7 +1376,11 @@ mod tests {
         match result {
             GuardrailAction::Modify(hashed) => {
                 // Original SSN must not appear in output
-                assert!(!hashed.contains("123-45-6789"), "SSN still visible: {}", hashed);
+                assert!(
+                    !hashed.contains("123-45-6789"),
+                    "SSN still visible: {}",
+                    hashed
+                );
                 // Token must match pattern [SSN_<8 hex chars>]
                 assert!(
                     hashed.contains("[SSN_"),
@@ -1391,8 +1395,8 @@ mod tests {
     /// REQ-13.3 acceptance: Hash is deterministic — same input gives same token.
     #[tokio::test]
     async fn test_pii_hash_is_deterministic() {
-        let detector = RegexPiiDetector::new()
-            .add_pattern(r"\b\d{3}-\d{2}-\d{4}\b", "ssn", PiiAction::Hash);
+        let detector =
+            RegexPiiDetector::new().add_pattern(r"\b\d{3}-\d{2}-\d{4}\b", "ssn", PiiAction::Hash);
 
         let text = "My SSN is 123-45-6789";
         let r1 = detector.check_input(text).await.unwrap();
@@ -1403,12 +1407,11 @@ mod tests {
     /// REQ-13.3 acceptance: Warn action allows text but prepends a warning.
     #[tokio::test]
     async fn test_pii_warn_action_allows_with_warning() {
-        let detector = RegexPiiDetector::new()
-            .add_pattern(
-                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
-                "email",
-                PiiAction::Warn,
-            );
+        let detector = RegexPiiDetector::new().add_pattern(
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+            "email",
+            PiiAction::Warn,
+        );
 
         let result = detector
             .check_input("Contact me at alice@example.com for details")
@@ -1479,8 +1482,8 @@ mod tests {
     /// REQ-13.3 acceptance: custom entity patterns added by the user work correctly.
     #[tokio::test]
     async fn test_pii_custom_entity_pattern() {
-        let detector = RegexPiiDetector::new()
-            .add_pattern(r"\bPASS-\d{6}\b", "passport", PiiAction::Redact);
+        let detector =
+            RegexPiiDetector::new().add_pattern(r"\bPASS-\d{6}\b", "passport", PiiAction::Redact);
 
         let result = detector
             .check_input("My passport is PASS-123456")
@@ -1498,12 +1501,11 @@ mod tests {
     /// REQ-13.3 acceptance: Hash and Redact apply to all occurrences in the text.
     #[tokio::test]
     async fn test_pii_applies_to_all_occurrences() {
-        let detector = RegexPiiDetector::new()
-            .add_pattern(
-                r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
-                "email",
-                PiiAction::Redact,
-            );
+        let detector = RegexPiiDetector::new().add_pattern(
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+            "email",
+            PiiAction::Redact,
+        );
 
         let result = detector
             .check_input("From: a@x.com and b@y.com are both registered")

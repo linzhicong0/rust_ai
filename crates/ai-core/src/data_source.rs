@@ -255,7 +255,10 @@ mod tests {
         }
 
         // Read with limit
-        let results = ds.read(DataQuery::new("items").with_limit(3)).await.unwrap();
+        let results = ds
+            .read(DataQuery::new("items").with_limit(3))
+            .await
+            .unwrap();
         assert_eq!(results.len(), 3);
 
         // Read with offset

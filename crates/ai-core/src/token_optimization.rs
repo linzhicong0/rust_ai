@@ -210,7 +210,11 @@ pub fn prune_context(
         .collect();
 
     // Sort by relevance (highest first)
-    relevant.sort_by(|a, b| b.relevance.partial_cmp(&a.relevance).unwrap_or(std::cmp::Ordering::Equal));
+    relevant.sort_by(|a, b| {
+        b.relevance
+            .partial_cmp(&a.relevance)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     // Keep entries until we hit the token budget
     let mut total_tokens = 0;
@@ -304,7 +308,7 @@ mod tests {
         assert_eq!(estimate_tokens(""), 0);
         assert_eq!(estimate_tokens("hi"), 1); // 2 chars -> (2+3)/4 = 1
         assert_eq!(estimate_tokens("hello world"), 3); // 11 chars -> (11+3)/4 = 3
-        // Longer text
+                                                       // Longer text
         let long_text = "a".repeat(100);
         assert_eq!(estimate_tokens(&long_text), 25); // (100+3)/4 = 25
     }

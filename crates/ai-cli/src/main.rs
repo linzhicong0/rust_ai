@@ -201,7 +201,14 @@ mod tests {
 
     #[test]
     fn test_cli_run_command_parses() {
-        let cli = Cli::parse_from(["ai", "run", "--agent", "my-agent", "--config", "config.toml"]);
+        let cli = Cli::parse_from([
+            "ai",
+            "run",
+            "--agent",
+            "my-agent",
+            "--config",
+            "config.toml",
+        ]);
         match cli.command {
             Commands::Run { agent, config } => {
                 assert_eq!(agent.unwrap(), "my-agent");
@@ -250,7 +257,9 @@ mod tests {
         let cli = Cli::parse_from(["ai", "deploy", "--target", "production", "--port", "9090"]);
         match cli.command {
             Commands::Deploy {
-                target, port, config,
+                target,
+                port,
+                config,
             } => {
                 assert_eq!(target, "production");
                 assert_eq!(port, 9090);
@@ -265,7 +274,9 @@ mod tests {
         let cli = Cli::parse_from(["ai", "deploy"]);
         match cli.command {
             Commands::Deploy {
-                target, port, config,
+                target,
+                port,
+                config,
             } => {
                 assert_eq!(target, "local");
                 assert_eq!(port, 8080);
@@ -339,4 +350,3 @@ mod tests {
         assert!(result.is_err());
     }
 }
-

@@ -191,7 +191,10 @@ impl RoutingRule {
         // Check keywords
         if !self.keywords.is_empty() {
             let prompt_lower = context.prompt.to_lowercase();
-            let has_keyword = self.keywords.iter().any(|k| prompt_lower.contains(&k.to_lowercase()));
+            let has_keyword = self
+                .keywords
+                .iter()
+                .any(|k| prompt_lower.contains(&k.to_lowercase()));
             if !has_keyword {
                 return false;
             }
@@ -430,7 +433,8 @@ mod tests {
         assert_eq!(decision.model, "gpt-3.5-turbo");
 
         // Long prompt should fall to default
-        let context = RoutingContext::new("This is a much longer prompt that exceeds twenty characters");
+        let context =
+            RoutingContext::new("This is a much longer prompt that exceeds twenty characters");
         let decision = router.route(&context).await.unwrap();
         assert_eq!(decision.model, "gpt-4");
     }
@@ -461,11 +465,15 @@ mod tests {
             TaskComplexity::Simple
         );
         assert_eq!(
-            RuleBasedRouter::estimate_complexity("explain why the sky is blue and compare it to other atmospheric phenomena"),
+            RuleBasedRouter::estimate_complexity(
+                "explain why the sky is blue and compare it to other atmospheric phenomena"
+            ),
             TaskComplexity::Moderate
         );
         assert_eq!(
-            RuleBasedRouter::estimate_complexity("```rust\nfn main() {\n    println!(\"hello\");\n}\n```"),
+            RuleBasedRouter::estimate_complexity(
+                "```rust\nfn main() {\n    println!(\"hello\");\n}\n```"
+            ),
             TaskComplexity::Complex
         );
     }
