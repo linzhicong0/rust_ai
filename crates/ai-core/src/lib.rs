@@ -234,12 +234,41 @@ pub use crate::sandbox::{
     SandboxExecutionResult, SandboxExecutor, SandboxPermission,
 };
 
+// Re-export access control (REQ-13.4)
+pub use crate::access_control::{
+    AccessControl, AccessControlError, AccessDecision, Permission, ResourceType,
+    Role as AccessRole,
+};
+
+// Re-export audit trail (REQ-13.5)
+pub use crate::audit_trail::{AuditAction, AuditEntry, AuditTrail, RetentionPolicy};
+
+// Re-export resource management (REQ-14.3)
+pub use crate::resource_management::{
+    QuotaConfig, QuotaTracker, ResourceConfig, ResourceError, ResourceHandle, ResourcePool,
+};
+
+// Re-export batch processing (REQ-14.4)
+pub use crate::batch_processing::{
+    BatchConfig, BatchError, BatchProcessor, BatchProgress, BatchRequest, BatchResult, BatchStatus,
+};
+
+// Re-export cloud deployment (REQ-16.3)
+pub use crate::cloud_deployment::{
+    AutoscalingConfig, CloudDeployment, CloudProvider, DeploymentConfig, DeploymentError,
+    DeploymentStatus, IaCFormat, ServiceIntegration,
+};
+
 // Module declarations
 pub mod ab_testing;
+pub mod access_control;
 pub mod audio;
+pub mod audit_trail;
+pub mod batch_processing;
 pub mod benchmark;
 pub mod channel;
 pub mod client;
+pub mod cloud_deployment;
 pub mod config;
 pub mod connection_pool;
 pub mod content_filter;
@@ -264,6 +293,7 @@ pub mod prompt_registry;
 pub mod provider;
 pub mod rate_limit;
 pub mod regression;
+pub mod resource_management;
 pub mod sandbox;
 pub mod scaling;
 pub mod scorer;
